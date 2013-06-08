@@ -164,7 +164,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key, char **bu
 	fsize = *((int *)&header[4]);
 	bsize = fsize / 8 + 1; /* block count */
 	
-	plaintext = malloc(bsize * 8 + 2);
+	plaintext = malloc(bsize * 8 + 3);
 	if (!plaintext) {
 		php_stream_pclose(stream);
 		return -1;
@@ -173,15 +173,16 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key, char **bu
 	/* For closing php script environment */
 	plaintext[0] = '?';
 	plaintext[1] = '>';
+	plaintext[2] = ' ';
 	
-	phpcode = &plaintext[2];
+	phpcode = &plaintext[3];
 	for (i = 0; i < bsize; i++) {
 		php_stream_read(stream, input, 8);
 		DES_decipher(input, &(phpcode[i * 8]), key);
 	}
 	
 	*buf = plaintext;
-	*len = fsize + 2;
+	*len = fsize + 3;
 	
 	php_stream_pclose(stream);
 	return 0;
