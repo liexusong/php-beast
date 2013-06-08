@@ -366,10 +366,10 @@ static void hash_resize(HashTable *h_old) {
 
 
 int hash_foreach(HashTable *htb, hash_foreach_handler handler) {
-    struct list_head *position;
+    struct list_head *position, *temp;
     HashNode *node;
     
-    list_for_each(position, &htb->list) {
+    list_for_each_safe(position, temp, &htb->list) {
         node = list_entry(position, HashNode, list);
         if (handler(node->key, node->keyLength, node->value) == -1) {
             return -1;

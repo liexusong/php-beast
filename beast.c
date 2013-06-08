@@ -37,8 +37,9 @@
 ZEND_DECLARE_MODULE_GLOBALS(beast)
 */
 
-#define HASH_INIT_SIZE 32
-#define FREE_CACHE_LENGTH 100
+#define HASH_INIT_SIZE          32
+#define FREE_CACHE_LENGTH       100
+#define DEFAULT_MAX_CACHE_SIZE  1048576
 
 struct beast_cache_item {
 	int   fsize;
@@ -56,6 +57,9 @@ static char authkey[8] = {0x01, 0x1f, 0x01, 0x1f, 0x01, 0x0e, 0x01, 0x0e};
 
 /* True global resources - no need for thread safety here */
 static int le_beast;
+static int max_cache_size = DEFAULT_MAX_CACHE_SIZE;
+static int cache_use_mem = 0;
+static int cache_threshold = 0;
 static HashTable *htable;
 static struct beast_cache_item *free_cache_list = NULL;
 static int free_cache_len = 0;
@@ -150,6 +154,21 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
 	return 0;
 }
 
+
+int beast_clean_cache(char *key, int keyLength, void *value) {
+	struct beast_cache_item *item;
+	
+	if (hash_remove(htable, key, &item) == 0) {
+		cache_use_mem -= item->rsize;
+		free(item->data); /* free cache data */
+		cache_item_free(item);
+		if (cache_use_mem <= cache_threshold) {
+			return -1; /* break foreach */
+		}
+	}
+	return 0;
+}
+
 /*****************************************************************************
 *                                                                            *
 *  Decrypt a cipher text file and output plain buffer                        *
@@ -171,7 +190,9 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 		return -1;
 	}
 	
-	if ((php_stream_read(stream, header, 8) != 8) || *((int *)&header[0]) != 0xe816a40c) {
+	if ((php_stream_read(stream, header, 8) != 8) ||
+	    *((int *)&header[0]) != 0xe816a40c)
+	{
 		php_stream_pclose(stream);
 		return -1;
 	}
@@ -180,7 +201,15 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 	bsize = fsize / 8 + 1; /* block count */
 	
 	allocsize = bsize * 8 + 3;
-	plaintext = malloc(allocsize);
+	
+	if (cache_use_mem + allocsize > max_cache_size) { /* exceed max cache size, free some cache */
+		cache_threshold = max_cache_size - allocsize;
+		hash_foreach(htable, beast_clean_cache);
+	}
+	
+	/* OK, we can alloc memory */
+	
+	plaintext = malloc(allocsize); /* alloc memory(1) */
 	if (!plaintext) {
 		php_stream_pclose(stream);
 		return -1;
@@ -200,6 +229,8 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 	*buf = plaintext;
 	*filesize = fsize + 3;
 	*realsize = allocsize;
+	
+	cache_use_mem += allocsize; /* all caches used memory size */
 	
 	php_stream_pclose(stream);
 	return 0;
@@ -223,7 +254,6 @@ struct beast_cache_item *cache_item_alloc()
 
 void cache_item_free(struct beast_cache_item *item)
 {
-	free(item->data);
 	if (free_cache_len < FREE_CACHE_LENGTH) { /* cache item */
 		item->next = free_cache_list;
 		free_cache_list = item;
@@ -244,21 +274,25 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 	struct beast_cache_item *cache;
 	int nfree = 0;
 	
-	if (hash_lookup(htable, h->filename, (void **)&cache) == 0) { /* if cache exists */
+	if (hash_lookup(htable, h->filename, (void **)&cache) == 0) { /* cache exists */
 		filesize = cache->fsize;
-		phpcode = cache->data;
+		phpcode  = cache->data;
 	} else { /* cache not exists */
-		if (decrypt_file_return_buffer(h->filename, authkey, &phpcode, &filesize, &realsize TSRMLS_CC) != 0) {
+		if (decrypt_file_return_buffer(h->filename, authkey, &phpcode, 
+		        &filesize, &realsize TSRMLS_CC) != 0)
+		{
 			return old_compile_file(h, type TSRMLS_CC);
 		}
+		
 		cache = cache_item_alloc();
 		if (!cache) {
 			nfree = 1;
 		} else {
-			cache->fsize = filesize;
-			cache->rsize = realsize;
-			cache->data = phpcode;
+			cache->fsize = filesize; /* save file size */
+			cache->rsize = realsize; /* save real size */
+			cache->data = phpcode;   /* save php code */
 			if (hash_insert(htable, h->filename, cache) != 0) {
+				cache_item_free(cache);
 				nfree = 1;
 			}
 		}
@@ -271,7 +305,7 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 	new_op_array = compile_string(&pv, "Beast module code" TSRMLS_CC);
 	
 	if (nfree) {
-		free(phpcode);
+		free(phpcode); /* free memory(1) */
 	}
 	
 	return new_op_array;
@@ -285,6 +319,27 @@ PHP_INI_BEGIN()
     STD_PHP_INI_ENTRY("beast.global_string", "foobar", PHP_INI_ALL, OnUpdateString, global_string, zend_beast_globals, beast_globals)
 PHP_INI_END()
 */
+
+ZEND_INI_MH(php_beast_cache_size) 
+{
+    if (new_value_length == 0) { 
+        return FAILURE;
+    }
+    
+    fprintf(stderr, "new cache size: %s\n", new_value);
+    
+    max_cache_size = atoi(new_value);
+    if (max_cache_size <= 0) {
+    	max_cache_size = DEFAULT_MAX_CACHE_SIZE;
+    }
+    
+    return SUCCESS; 
+}
+
+PHP_INI_BEGIN()
+    PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL, php_beast_cache_size) 
+PHP_INI_END()
+
 /* }}} */
 
 /* {{{ php_beast_init_globals
@@ -305,9 +360,8 @@ static void php_beast_init_globals(zend_beast_globals *beast_globals)
  */
 PHP_MINIT_FUNCTION(beast)
 {
-	/* If you have INI entries, uncomment these lines 
+	/* If you have INI entries, uncomment these lines */
 	REGISTER_INI_ENTRIES();
-	*/
 	
 	old_compile_file = zend_compile_file;
 	zend_compile_file = my_compile_file;
@@ -334,9 +388,9 @@ void beast_destroy_handler(void *data)
  */
 PHP_MSHUTDOWN_FUNCTION(beast)
 {
-	/* uncomment this line if you have INI entries
+	/* uncomment this line if you have INI entries */
 	UNREGISTER_INI_ENTRIES();
-	*/
+
 	hash_destroy(htable, &beast_destroy_handler);
 	return SUCCESS;
 }
@@ -368,9 +422,8 @@ PHP_MINFO_FUNCTION(beast)
 	php_info_print_table_header(2, "beast support", "enabled");
 	php_info_print_table_end();
 
-	/* Remove comments if you have entries in php.ini
+	/* Remove comments if you have entries in php.ini */
 	DISPLAY_INI_ENTRIES();
-	*/
 }
 /* }}} */
 
@@ -385,7 +438,9 @@ PHP_FUNCTION(beast_encode_file)
 	int input_len, output_len;
 	int retval;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss", &input, &input_len, &output, &output_len TSRMLS_CC) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss", &input, 
+	        &input_len, &output, &output_len TSRMLS_CC) == FAILURE)
+	{
 		return;
 	}
 	
