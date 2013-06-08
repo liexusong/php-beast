@@ -37,6 +37,16 @@
 ZEND_DECLARE_MODULE_GLOBALS(beast)
 */
 
+#define HASH_INIT_SIZE 32
+#define FREE_CACHE_LENGTH 100
+
+struct beast_cache_item {
+	int   fsize;
+	int   rsize;
+	void *data;
+	struct beast_cache_item *next;
+};
+
 zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 
 /*
@@ -46,6 +56,9 @@ static char authkey[8] = {0x01, 0x1f, 0x01, 0x1f, 0x01, 0x0e, 0x01, 0x0e};
 
 /* True global resources - no need for thread safety here */
 static int le_beast;
+static HashTable *htable;
+static struct beast_cache_item *free_cache_list = NULL;
+static int free_cache_len = 0;
 
 /* {{{ beast_functions[]
  *
@@ -143,9 +156,11 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
 *                                                                            *
 *****************************************************************************/
 
-int decrypt_file_return_buffer(const char *inputfile, const char *key, char **buf, int *len TSRMLS_DC) {
+int decrypt_file_return_buffer(const char *inputfile, const char *key,
+        char **buf, int *filesize, int *realsize TSRMLS_DC) {
 	php_stream *stream;
 	int fsize, bsize, i;
+	int allocsize;
 	char input[8];
 	char header[8];
 	char *plaintext, *phpcode;
@@ -164,7 +179,8 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key, char **bu
 	fsize = *((int *)&header[4]);
 	bsize = fsize / 8 + 1; /* block count */
 	
-	plaintext = malloc(bsize * 8 + 3);
+	allocsize = bsize * 8 + 3;
+	plaintext = malloc(allocsize);
 	if (!plaintext) {
 		php_stream_pclose(stream);
 		return -1;
@@ -182,10 +198,39 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key, char **bu
 	}
 	
 	*buf = plaintext;
-	*len = fsize + 3;
+	*filesize = fsize + 3;
+	*realsize = allocsize;
 	
 	php_stream_pclose(stream);
 	return 0;
+}
+
+
+struct beast_cache_item *cache_item_alloc()
+{
+	struct beast_cache_item *item;
+	
+	if (free_cache_len > 0) {
+		item = free_cache_list;
+		free_cache_list = free_cache_list->next;
+		free_cache_len--;
+	} else {
+		item = malloc(sizeof(*item));
+	}
+	return item;
+}
+
+
+void cache_item_free(struct beast_cache_item *item)
+{
+	free(item->data);
+	if (free_cache_len < FREE_CACHE_LENGTH) { /* cache item */
+		item->next = free_cache_list;
+		free_cache_list = item;
+		free_cache_len++;
+	} else {
+		free(item);
+	}
 }
 
 
@@ -193,12 +238,30 @@ zend_op_array*
 my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 {
 	char *phpcode;
-	int filesize;
+	int filesize, realsize;
 	zval pv;
 	zend_op_array *new_op_array;
-
-	if (decrypt_file_return_buffer(h->filename, authkey, &phpcode, &filesize TSRMLS_CC) != 0) {
-		return old_compile_file(h, type TSRMLS_CC);
+	struct beast_cache_item *cache;
+	int nfree = 0;
+	
+	if (hash_lookup(htable, h->filename, (void **)&cache) == 0) { /* if cache exists */
+		filesize = cache->fsize;
+		phpcode = cache->data;
+	} else { /* cache not exists */
+		if (decrypt_file_return_buffer(h->filename, authkey, &phpcode, &filesize, &realsize TSRMLS_CC) != 0) {
+			return old_compile_file(h, type TSRMLS_CC);
+		}
+		cache = cache_item_alloc();
+		if (!cache) {
+			nfree = 1;
+		} else {
+			cache->fsize = filesize;
+			cache->rsize = realsize;
+			cache->data = phpcode;
+			if (hash_insert(htable, h->filename, cache) != 0) {
+				nfree = 1;
+			}
+		}
 	}
 	
 	pv.value.str.len = filesize;
@@ -207,7 +270,9 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 	
 	new_op_array = compile_string(&pv, "Beast module code" TSRMLS_CC);
 	
-	free(phpcode);
+	if (nfree) {
+		free(phpcode);
+	}
 	
 	return new_op_array;
 }
@@ -246,10 +311,24 @@ PHP_MINIT_FUNCTION(beast)
 	
 	old_compile_file = zend_compile_file;
 	zend_compile_file = my_compile_file;
+	
+	htable = hash_alloc(HASH_INIT_SIZE);
+	if (!htable) {
+	    return FAILURE;
+	}
 
 	return SUCCESS;
 }
 /* }}} */
+
+void beast_destroy_handler(void *data)
+{
+	struct beast_cache_item *item = data;
+	if (item) {
+		free(item->data);
+		free(item);
+	}
+}
 
 /* {{{ PHP_MSHUTDOWN_FUNCTION
  */
@@ -258,6 +337,7 @@ PHP_MSHUTDOWN_FUNCTION(beast)
 	/* uncomment this line if you have INI entries
 	UNREGISTER_INI_ENTRIES();
 	*/
+	hash_destroy(htable, &beast_destroy_handler);
 	return SUCCESS;
 }
 /* }}} */
