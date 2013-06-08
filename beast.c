@@ -332,7 +332,7 @@ ZEND_INI_MH(php_beast_cache_size)
     	max_cache_size = DEFAULT_MAX_CACHE_SIZE;
     }
     
-    return SUCCESS; 
+    return SUCCESS;
 }
 
 PHP_INI_BEGIN()
