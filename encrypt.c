@@ -9,11 +9,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "php.h"
-#include "zend.h"
-#include "zend_API.h"
-#include "php_streams.h"
-
 #include "bit.h"
 #include "encrypt.h"
 
@@ -528,110 +523,5 @@ DES_main(ciphertext, plaintext, key, decipher);
 
 return;
 
-}
-
-
-/*****************************************************************************
-*                                                                            *
-*  Encrypt a plain text file and output a cipher file                        *
-*                                                                            *
-*****************************************************************************/
-
-int encrypt_file(const char *inputfile, const char *outputfile, const char *key TSRMLS_DC) {
-	php_stream *input_stream, *output_stream;
-	php_stream_statbuf stat_ssb;
-	int fsize, fcount, i;
-	char input[8], output[8];
-	char header[8];
-	
-	/* Open input file */
-	input_stream = php_stream_open_wrapper(inputfile, "r",
-		ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
-	if (!input_stream) {
-		return -1;
-	}
-
-	/* Get input file size */
-	if (php_stream_stat(input_stream, &stat_ssb)) {
-		php_stream_pclose(input_stream);
-		return -1;
-	}
-	fsize = stat_ssb.sb.st_size;
-
-	/* Open output file */
-	output_stream = php_stream_open_wrapper(outputfile, "w+",
-		ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
-	if (!output_stream) {
-		php_stream_pclose(input_stream);
-		return -1;
-	}
-	
-	fcount = fsize / 8 + 1;
-	*((int *)&header[0]) = 0xe816a40c;
-	*((int *)&header[4]) = fsize;
-
-	php_stream_write(output_stream, header, 8);
-	
-	for (i = 0; i < fcount; i++)
-	{
-		memset(input, 0, 8);
-		(void)php_stream_read(input_stream, input, 8);
-		DES_encipher(input, output, key);
-		php_stream_write(output_stream, output, 8);
-	}
-	
-	php_stream_pclose(input_stream);
-	php_stream_pclose(output_stream);
-	return 0;
-}
-
-/*****************************************************************************
-*                                                                            *
-*  Decrypt a cipher text file and output plain buffer                        *
-*                                                                            *
-*****************************************************************************/
-
-int decrypt_file_return_buffer(const char *inputfile, const char *key, char **buf, int *len TSRMLS_DC) {
-	php_stream *stream;
-	int fsize, bsize, i;
-	char input[8];
-	char header[8];
-	char *plaintext, *phpcode;
-	
-	stream = php_stream_open_wrapper(inputfile, "r",
-		ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
-	if (!stream) {
-		return -1;
-	}
-	
-	if ((php_stream_read(stream, header, 8) != 8) || *((int *)&header[0]) != 0xe816a40c) {
-		php_stream_pclose(stream);
-		return -1;
-	}
-	
-	fsize = *((int *)&header[4]);
-	bsize = fsize / 8 + 1; /* block count */
-	
-	plaintext = malloc(bsize * 8 + 2);
-	if (!plaintext) {
-		php_stream_pclose(stream);
-		return -1;
-	}
-	
-	/* For closing php script environment */
-	plaintext[0] = '?';
-	plaintext[1] = '>';
-	
-	phpcode = &plaintext[2];
-	for (i = 0; i < bsize; i++) {
-		php_stream_read(stream, input, 8);
-		DES_decipher(input, &(phpcode[i * 8]), key);
-	}
-	
-	*buf = plaintext;
-	*len = fsize + 2;
-	
-	php_stream_pclose(stream);
-	return 0;
 }
 
