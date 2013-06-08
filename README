@@ -17,11 +17,22 @@
 
 
 使用方法:
-==========================================
+=========
 修改beast.c文件的authkey加密key, 编译安装,
 接着使用beast_encode_file()函数进行加密,
 加密后的文件beast模块能自动识别.
 
+
+编译安装如下:
+-------------
+$ wget https://github.com/liexusong/php-beast/archive/master.zip
+$ unzip master.zip
+$ cd php-beast-master
+$ phpize
+$ ./configure
+$ sudo make && make install
+
+编译好之后修改php.ini配置文件, 加入配置项: extension=beast.so, 重启php-fpm
 
 ------------------------------
 作者: 列旭松(280259971@qq.com)

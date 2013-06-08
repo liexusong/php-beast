@@ -91,7 +91,7 @@ zend_module_entry beast_module_entry = {
 	PHP_RSHUTDOWN(beast),	/* Replace with NULL if there's nothing to do at request end */
 	PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-	"0.1", /* Replace with version number for your extension */
+	"0.2", /* Replace with version number for your extension */
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
