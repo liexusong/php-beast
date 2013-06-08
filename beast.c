@@ -53,7 +53,10 @@ zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 /*
  * authkey, you can change it.
  */
-static char authkey[8] = {0x01, 0x1f, 0x01, 0x1f, 0x01, 0x0e, 0x01, 0x0e};
+static char authkey[8] = {
+	0x01, 0x1f, 0x01, 0x1f,
+	0x01, 0x0e, 0x01, 0x0e
+};
 
 /* True global resources - no need for thread safety here */
 static int le_beast;
@@ -99,6 +102,31 @@ ZEND_GET_MODULE(beast)
 #endif
 
 
+struct beast_cache_item *cache_item_alloc()
+{
+	struct beast_cache_item *item;
+	
+	if (free_cache_len > 0) {
+		item = free_cache_list;
+		free_cache_list = free_cache_list->next;
+		free_cache_len--;
+	} else {
+		item = malloc(sizeof(*item));
+	}
+	return item;
+}
+
+
+void cache_item_free(struct beast_cache_item *item)
+{
+	if (free_cache_len < FREE_CACHE_LENGTH) { /* cache item */
+		item->next = free_cache_list;
+		free_cache_list = item;
+		free_cache_len++;
+	} else {
+		free(item);
+	}
+}
 
 /*****************************************************************************
 *                                                                            *
@@ -203,11 +231,11 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 	allocsize = bsize * 8 + 3;
 	
 	if (cache_use_mem + allocsize > max_cache_size) { /* exceed max cache size, free some cache */
-		cache_threshold = max_cache_size - allocsize;
+		cache_threshold = max_cache_size - allocsize; /* set threshold value */
 		hash_foreach(htable, beast_clean_cache);
 	}
 	
-	/* OK, we can alloc memory */
+	/* OK, enough memory to alloc caches */
 	
 	plaintext = malloc(allocsize); /* alloc memory(1) */
 	if (!plaintext) {
@@ -234,33 +262,6 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 	
 	php_stream_pclose(stream);
 	return 0;
-}
-
-
-struct beast_cache_item *cache_item_alloc()
-{
-	struct beast_cache_item *item;
-	
-	if (free_cache_len > 0) {
-		item = free_cache_list;
-		free_cache_list = free_cache_list->next;
-		free_cache_len--;
-	} else {
-		item = malloc(sizeof(*item));
-	}
-	return item;
-}
-
-
-void cache_item_free(struct beast_cache_item *item)
-{
-	if (free_cache_len < FREE_CACHE_LENGTH) { /* cache item */
-		item->next = free_cache_list;
-		free_cache_list = item;
-		free_cache_len++;
-	} else {
-		free(item);
-	}
 }
 
 
@@ -325,8 +326,6 @@ ZEND_INI_MH(php_beast_cache_size)
     if (new_value_length == 0) { 
         return FAILURE;
     }
-    
-    fprintf(stderr, "new cache size: %s\n", new_value);
     
     max_cache_size = atoi(new_value);
     if (max_cache_size <= 0) {
