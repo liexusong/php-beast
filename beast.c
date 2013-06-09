@@ -243,7 +243,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 		return -1;
 	}
 	
-	/* For closing php script environment */
+	/* For closing php script environment " ?>" */
 	plaintext[0] = ' ';
 	plaintext[1] = '?';
 	plaintext[2] = '>';
