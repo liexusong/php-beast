@@ -244,9 +244,9 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 	}
 	
 	/* For closing php script environment */
-	plaintext[0] = '?';
-	plaintext[1] = '>';
-	plaintext[2] = ' ';
+	plaintext[0] = ' ';
+	plaintext[1] = '?';
+	plaintext[2] = '>';
 	
 	phpcode = &plaintext[3];
 	for (i = 0; i < bsize; i++) {
