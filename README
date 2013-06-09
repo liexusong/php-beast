@@ -34,7 +34,13 @@ $ sudo make && make install
 
 编译好之后修改php.ini配置文件, 加入配置项: extension=beast.so, 重启php-fpm
 
+TODO:
+-----
+* 增加opcode缓存
+
 ------------------------------
 作者: 列旭松(280259971@qq.com)
+
+<a href="http://book.jd.com/11123177.html">http://book.jd.com/11123177.html</a>
 ------------------------------
 
