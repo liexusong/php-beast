@@ -365,13 +365,13 @@ static void hash_resize(HashTable *h_old) {
 }
 
 
-int hash_foreach(HashTable *htb, hash_foreach_handler handler) {
+int hash_foreach(HashTable *htb, hash_foreach_handler handler, void *data) {
     struct list_head *position, *temp;
     HashNode *node;
     
     list_for_each_safe(position, temp, &htb->list) {
         node = list_entry(position, HashNode, list);
-        if (handler(node->key, node->keyLength, node->value) == -1) {
+        if (handler(node->key, node->keyLength, node->value, data) == -1) {
             return -1;
         }
     }

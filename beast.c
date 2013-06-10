@@ -73,6 +73,7 @@ static int free_cache_len = 0;
  */
 zend_function_entry beast_functions[] = {
 	PHP_FE(beast_encode_file, NULL)
+	PHP_FE(beast_cache_status, NULL)
 	{NULL, NULL, NULL}	/* Must be the last line in beast_functions[] */
 };
 /* }}} */
@@ -183,7 +184,7 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
 }
 
 
-int beast_clean_cache(char *key, int keyLength, void *value) {
+int beast_clean_cache(char *key, int keyLength, void *value, void *data) {
 	struct beast_cache_item *item;
 	
 	if (hash_remove(htable, key, &item) == 0) {
@@ -232,7 +233,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 	
 	if (cache_use_mem + allocsize > max_cache_size) { /* exceed max cache size, free some cache */
 		cache_threshold = max_cache_size - allocsize; /* set threshold value */
-		hash_foreach(htable, beast_clean_cache);
+		hash_foreach(htable, beast_clean_cache, NULL);
 	}
 	
 	/* OK, enough memory to alloc caches */
@@ -465,6 +466,23 @@ PHP_FUNCTION(beast_encode_file)
 	if (retval == -1)
 		RETURN_FALSE;
 	RETURN_TRUE;
+}
+
+
+int beast_cache_list(char *key, int keyLength, void *value, void *data)
+{
+	zval *retval = data;
+	struct beast_cache_item *item = value;
+	
+	add_assoc_long(retval, key, item->rsize);
+}
+
+
+PHP_FUNCTION(beast_cache_status)
+{
+	array_init(return_value);
+	hash_foreach(htable, beast_cache_list, (void *)return_value);
+	add_assoc_long(return_value, "total", cache_use_mem);
 }
 /* }}} */
 

@@ -61,7 +61,7 @@ struct sHashKey {
 };
 
 typedef void (*hash_destroy_function)(void *);
-typedef int (*hash_foreach_handler)(char *key, int keyLength, void *value);
+typedef int (*hash_foreach_handler)(char *key, int keyLength, void *value, void *data);
 
 HashTable *hash_alloc(int size);
 int hash_insert(HashTable *htb, char *key, void *value);
@@ -71,6 +71,6 @@ int hash_replace(HashTable *htb, char *key, void *nvalue, void **retval);
 int hash_remove(HashTable *htb, char *key, void **retval);
 void hash_destroy(HashTable *htb, hash_destroy_function destroy);
 void hash_try_resize(HashTable *htb);
-int hash_foreach(HashTable *htb, hash_foreach_handler handler);
+int hash_foreach(HashTable *htb, hash_foreach_handler handler, void *data);
 
 #endif
