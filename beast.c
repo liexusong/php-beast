@@ -269,7 +269,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 zend_op_array* 
 my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 {
-	char *phpcode;
+	char *phpcode, *file_path;
 	int filesize, realsize;
 	zval pv;
 	zend_op_array *new_op_array;
@@ -300,11 +300,17 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 		}
 	}
 	
+	if (h->opened_path) {
+		file_path = h->opened_path;
+	} else {
+		file_path = h->filename;
+	}
+	
 	pv.value.str.len = filesize;
 	pv.value.str.val = phpcode;
 	pv.type = IS_STRING;
 	
-	new_op_array = compile_string(&pv, "Beast module code" TSRMLS_CC);
+	new_op_array = compile_string(&pv, file_path TSRMLS_CC);
 	
 	if (nfree) {
 		free(phpcode); /* free memory(1) */
