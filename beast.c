@@ -66,6 +66,8 @@ static int cache_threshold = 0;
 static HashTable *htable;
 static struct beast_cache_item *free_cache_list = NULL;
 static int free_cache_len = 0;
+static int cache_hits = 0;
+static int cache_miss = 0;
 
 /* {{{ beast_functions[]
  *
@@ -74,6 +76,7 @@ static int free_cache_len = 0;
 zend_function_entry beast_functions[] = {
 	PHP_FE(beast_encode_file, NULL)
 	PHP_FE(beast_cache_status, NULL)
+	PHP_FE(beast_clean_caches, NULL)
 	{NULL, NULL, NULL}	/* Must be the last line in beast_functions[] */
 };
 /* }}} */
@@ -279,6 +282,7 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 	if (hash_lookup(htable, h->filename, (void **)&cache) == 0) { /* cache exists */
 		filesize = cache->fsize;
 		phpcode  = cache->data;
+		cache_hits++;
 	} else { /* cache not exists */
 		if (decrypt_file_return_buffer(h->filename, authkey, &phpcode, 
 		        &filesize, &realsize TSRMLS_CC) != 0)
@@ -298,6 +302,7 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 				nfree = 1;
 			}
 		}
+		cache_miss++;
 	}
 	
 	if (h->opened_path) {
@@ -489,6 +494,27 @@ PHP_FUNCTION(beast_cache_status)
 	array_init(return_value);
 	hash_foreach(htable, beast_cache_list, (void *)return_value);
 	add_assoc_long(return_value, "total", cache_use_mem);
+	add_assoc_long(return_value, "cache_hits", cache_hits);
+	add_assoc_long(return_value, "cache_miss", cache_miss);
+}
+
+
+int __clean_cache(char *key, int keyLength, void *value, void *data)
+{
+	struct beast_cache_item *item;
+	
+	if (hash_remove(htable, key, &item) == 0) {
+		cache_use_mem -= item->rsize;
+		free(item->data); /* free cache data */
+		cache_item_free(item);
+	}
+	return 0;
+}
+
+PHP_FUNCTION(beast_clean_caches)
+{
+	hash_foreach(htable, __clean_cache, NULL);
+	RETURN_TRUE();
 }
 /* }}} */
 
