@@ -514,7 +514,7 @@ int __clean_cache(char *key, int keyLength, void *value, void *data)
 PHP_FUNCTION(beast_clean_caches)
 {
 	hash_foreach(htable, __clean_cache, NULL);
-	RETURN_TRUE();
+	RETURN_TRUE;
 }
 /* }}} */
 
