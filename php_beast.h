@@ -41,8 +41,8 @@ PHP_RSHUTDOWN_FUNCTION(beast);
 PHP_MINFO_FUNCTION(beast);
 
 PHP_FUNCTION(beast_encode_file);
-PHP_FUNCTION(beast_cache_status);
-PHP_FUNCTION(beast_clean_caches);
+PHP_FUNCTION(beast_avail_cache);
+PHP_FUNCTION(beast_cache_info);
 
 /* 
   	Declare any global variables you may need between the BEGIN

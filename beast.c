@@ -31,22 +31,14 @@
 #include "ext/standard/info.h"
 #include "php_streams.h"
 #include "php_beast.h"
+#include "cache.h"
 #include "encrypt.h"
 
 /* If you declare any globals in php_beast.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(beast)
 */
 
-#define HASH_INIT_SIZE          32
-#define FREE_CACHE_LENGTH       100
-#define DEFAULT_MAX_CACHE_SIZE  1048576
-
-struct beast_cache_item {
-	int   fsize;
-	int   rsize;
-	void *data;
-	struct beast_cache_item *next;
-};
+#define DEFAULT_CACHE_SIZE (5 * 1024 * 1024)
 
 zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 
@@ -60,12 +52,7 @@ static char authkey[8] = {
 
 /* True global resources - no need for thread safety here */
 static int le_beast;
-static int max_cache_size = DEFAULT_MAX_CACHE_SIZE;
-static int cache_use_mem = 0;
-static int cache_threshold = 0;
-static HashTable *htable;
-static struct beast_cache_item *free_cache_list = NULL;
-static int free_cache_len = 0;
+static int max_cache_size = DEFAULT_CACHE_SIZE;
 static int cache_hits = 0;
 static int cache_miss = 0;
 
@@ -75,8 +62,8 @@ static int cache_miss = 0;
  */
 zend_function_entry beast_functions[] = {
 	PHP_FE(beast_encode_file, NULL)
-	PHP_FE(beast_cache_status, NULL)
-	PHP_FE(beast_clean_caches, NULL)
+	PHP_FE(beast_avail_cache, NULL)
+	PHP_FE(beast_cache_info,  NULL)
 	{NULL, NULL, NULL}	/* Must be the last line in beast_functions[] */
 };
 /* }}} */
@@ -95,7 +82,7 @@ zend_module_entry beast_module_entry = {
 	PHP_RSHUTDOWN(beast),	/* Replace with NULL if there's nothing to do at request end */
 	PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-	"0.2", /* Replace with version number for your extension */
+	"0.3", /* Replace with version number for your extension */
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
@@ -106,39 +93,14 @@ ZEND_GET_MODULE(beast)
 #endif
 
 
-struct beast_cache_item *cache_item_alloc()
-{
-	struct beast_cache_item *item;
-	
-	if (free_cache_len > 0) {
-		item = free_cache_list;
-		free_cache_list = free_cache_list->next;
-		free_cache_len--;
-	} else {
-		item = malloc(sizeof(*item));
-	}
-	return item;
-}
-
-
-void cache_item_free(struct beast_cache_item *item)
-{
-	if (free_cache_len < FREE_CACHE_LENGTH) { /* cache item */
-		item->next = free_cache_list;
-		free_cache_list = item;
-		free_cache_len++;
-	} else {
-		free(item);
-	}
-}
-
 /*****************************************************************************
 *                                                                            *
 *  Encrypt a plain text file and output a cipher file                        *
 *                                                                            *
 *****************************************************************************/
 
-int encrypt_file(const char *inputfile, const char *outputfile, const char *key TSRMLS_DC) {
+int encrypt_file(const char *inputfile, const char *outputfile, const char *key TSRMLS_DC)
+{
 	php_stream *input_stream, *output_stream;
 	php_stream_statbuf stat_ssb;
 	int fsize, fcount, i;
@@ -187,20 +149,6 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
 }
 
 
-int beast_clean_cache(char *key, int keyLength, void *value, void *data) {
-	struct beast_cache_item *item;
-	
-	if (hash_remove(htable, key, &item) == 0) {
-		cache_use_mem -= item->rsize;
-		free(item->data); /* free cache data */
-		cache_item_free(item);
-		if (cache_use_mem <= cache_threshold) {
-			return -1; /* break foreach */
-		}
-	}
-	return 0;
-}
-
 /*****************************************************************************
 *                                                                            *
 *  Decrypt a cipher text file and output plain buffer                        *
@@ -208,19 +156,43 @@ int beast_clean_cache(char *key, int keyLength, void *value, void *data) {
 *****************************************************************************/
 
 int decrypt_file_return_buffer(const char *inputfile, const char *key,
-        char **buf, int *filesize, int *realsize TSRMLS_DC) {
+        char **buffer, int *filesize TSRMLS_DC)
+{
 	php_stream *stream;
-	int fsize, bsize, i;
-	int allocsize;
+	php_stream_statbuf stat_ssb;
+	cache_key_t ckey;
+	cache_item_t *citem;
+	int fsize, bsize, msize, i;
 	char input[8];
 	char header[8];
-	char *plaintext, *phpcode;
+	char *text, *script;
 	
 	stream = php_stream_open_wrapper(inputfile, "r",
 		ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
 	if (!stream) {
 		return -1;
 	}
+	
+	if (php_stream_stat(stream, &stat_ssb)) {
+		php_stream_pclose(stream);
+		return -1;
+	}
+	
+	/* here not set file size because find cache not need file size */
+	ckey.device = stat_ssb.sb.st_dev;
+	ckey.inode = stat_ssb.sb.st_ino;
+	ckey.mtime = stat_ssb.sb.st_mtime;
+	
+	citem = beast_cache_find(&ckey); /* find cache */
+	if (citem) { /* found cache */
+		*buffer = beast_cache_cdata(citem);
+		*filesize = beast_cache_fsize(citem) + 3;
+		php_stream_pclose(stream);
+		cache_hits++;
+		return 0;
+	}
+	
+	/* not found cache */
 	
 	if ((php_stream_read(stream, header, 8) != 8) ||
 	    *((int *)&header[0]) != 0xe816a40c)
@@ -231,40 +203,38 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 	
 	fsize = *((int *)&header[4]);
 	bsize = fsize / 8 + 1; /* block count */
+	msize = bsize * 8 + 3;
 	
-	allocsize = bsize * 8 + 3;
+	ckey.fsize = fsize; /* set file size */
 	
-	if (cache_use_mem + allocsize > max_cache_size) { /* exceed max cache size, free some cache */
-		cache_threshold = max_cache_size - allocsize; /* set threshold value */
-		hash_foreach(htable, beast_clean_cache, NULL);
-	}
-	
-	/* OK, enough memory to alloc caches */
-	
-	plaintext = malloc(allocsize); /* alloc memory(1) */
-	if (!plaintext) {
+	citem = beast_cache_create(&ckey, msize);
+	if (!citem) {
 		php_stream_pclose(stream);
 		return -1;
 	}
 	
-	/* For closing php script environment " ?>" */
-	plaintext[0] = ' ';
-	plaintext[1] = '?';
-	plaintext[2] = '>';
+	text = beast_cache_cdata(citem);
 	
-	phpcode = &plaintext[3];
+	/* For closing php script environment " ?>" */
+	text[0] = ' ';
+	text[1] = '?';
+	text[2] = '>';
+	
+	script = &text[3];
 	for (i = 0; i < bsize; i++) {
 		php_stream_read(stream, input, 8);
-		DES_decipher(input, &(phpcode[i * 8]), key);
+		DES_decipher(input, &(script[i * 8]), key);
 	}
 	
-	*buf = plaintext;
-	*filesize = fsize + 3;
-	*realsize = allocsize;
-	
-	cache_use_mem += allocsize; /* all caches used memory size */
-	
 	php_stream_pclose(stream);
+	
+	citem = beast_cache_push(citem); /* push into cache item to manager */
+	
+	*buffer = beast_cache_cdata(citem);
+	*filesize = beast_cache_fsize(citem) + 3;
+	
+	cache_miss++;
+	
 	return 0;
 }
 
@@ -272,37 +242,15 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 zend_op_array* 
 my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 {
-	char *phpcode, *file_path;
-	int filesize, realsize;
+	char *script, *file_path;
+	int fsize;
 	zval pv;
 	zend_op_array *new_op_array;
-	struct beast_cache_item *cache;
-	int nfree = 0;
 	
-	if (hash_lookup(htable, h->filename, (void **)&cache) == 0) { /* cache exists */
-		filesize = cache->fsize;
-		phpcode  = cache->data;
-		cache_hits++;
-	} else { /* cache not exists */
-		if (decrypt_file_return_buffer(h->filename, authkey, &phpcode, 
-		        &filesize, &realsize TSRMLS_CC) != 0)
-		{
-			return old_compile_file(h, type TSRMLS_CC);
-		}
-		
-		cache = cache_item_alloc();
-		if (!cache) {
-			nfree = 1;
-		} else {
-			cache->fsize = filesize; /* save file size */
-			cache->rsize = realsize; /* save real size */
-			cache->data = phpcode;   /* save php code */
-			if (hash_insert(htable, h->filename, cache) != 0) {
-				cache_item_free(cache);
-				nfree = 1;
-			}
-		}
-		cache_miss++;
+	if (decrypt_file_return_buffer(h->filename, authkey, &script, 
+	        &fsize TSRMLS_CC) != 0)
+	{
+		return old_compile_file(h, type TSRMLS_CC);
 	}
 	
 	if (h->opened_path) {
@@ -311,15 +259,11 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 		file_path = h->filename;
 	}
 	
-	pv.value.str.len = filesize;
-	pv.value.str.val = phpcode;
+	pv.value.str.len = fsize;
+	pv.value.str.val = script;
 	pv.type = IS_STRING;
 	
 	new_op_array = compile_string(&pv, file_path TSRMLS_CC);
-	
-	if (nfree) {
-		free(phpcode); /* free memory(1) */
-	}
 	
 	return new_op_array;
 }
@@ -341,14 +285,14 @@ ZEND_INI_MH(php_beast_cache_size)
     
     max_cache_size = atoi(new_value);
     if (max_cache_size <= 0) {
-    	max_cache_size = DEFAULT_MAX_CACHE_SIZE;
+    	max_cache_size = DEFAULT_CACHE_SIZE;
     }
     
     return SUCCESS;
 }
 
 PHP_INI_BEGIN()
-    PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL, php_beast_cache_size) 
+    PHP_INI_ENTRY("beast.cache_size", "5242880", PHP_INI_ALL, php_beast_cache_size) 
 PHP_INI_END()
 
 /* }}} */
@@ -374,26 +318,16 @@ PHP_MINIT_FUNCTION(beast)
 	/* If you have INI entries, uncomment these lines */
 	REGISTER_INI_ENTRIES();
 	
+	if (beast_cache_init(max_cache_size) == -1) {
+		return FAILURE;
+	}
+	
 	old_compile_file = zend_compile_file;
 	zend_compile_file = my_compile_file;
 	
-	htable = hash_alloc(HASH_INIT_SIZE);
-	if (!htable) {
-	    return FAILURE;
-	}
-
 	return SUCCESS;
 }
 /* }}} */
-
-void beast_destroy_handler(void *data)
-{
-	struct beast_cache_item *item = data;
-	if (item) {
-		free(item->data);
-		free(item);
-	}
-}
 
 /* {{{ PHP_MSHUTDOWN_FUNCTION
  */
@@ -401,8 +335,6 @@ PHP_MSHUTDOWN_FUNCTION(beast)
 {
 	/* uncomment this line if you have INI entries */
 	UNREGISTER_INI_ENTRIES();
-
-	hash_destroy(htable, &beast_destroy_handler);
 	return SUCCESS;
 }
 /* }}} */
@@ -480,42 +412,21 @@ PHP_FUNCTION(beast_encode_file)
 }
 
 
-int beast_cache_list(char *key, int keyLength, void *value, void *data)
+PHP_FUNCTION(beast_avail_cache)
 {
-	zval *retval = data;
-	struct beast_cache_item *item = value;
-	
-	add_assoc_long(retval, key, item->rsize);
+	int size = beast_mm_availspace();
+	RETURN_LONG(size);
 }
 
 
-PHP_FUNCTION(beast_cache_status)
+PHP_FUNCTION(beast_cache_info)
 {
 	array_init(return_value);
-	hash_foreach(htable, beast_cache_list, (void *)return_value);
-	add_assoc_long(return_value, "total", cache_use_mem);
+	beast_cache_info(return_value);
 	add_assoc_long(return_value, "cache_hits", cache_hits);
 	add_assoc_long(return_value, "cache_miss", cache_miss);
 }
 
-
-int __clean_cache(char *key, int keyLength, void *value, void *data)
-{
-	struct beast_cache_item *item;
-	
-	if (hash_remove(htable, key, &item) == 0) {
-		cache_use_mem -= item->rsize;
-		free(item->data); /* free cache data */
-		cache_item_free(item);
-	}
-	return 0;
-}
-
-PHP_FUNCTION(beast_clean_caches)
-{
-	hash_foreach(htable, __clean_cache, NULL);
-	RETURN_TRUE;
-}
 /* }}} */
 
 
