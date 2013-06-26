@@ -53,11 +53,11 @@ static beast_locker_t beast_mm_locker;
 static inline int beast_mm_alignmem(int bits)
 {
     typedef union {
-    	void* p;
-    	int i;
-    	long l;
-    	double d;
-    	void (*f)();
+        void* p;
+        int i;
+        long l;
+        double d;
+        void (*f)();
     } beast_word_t; /* may be 8 bits */
     
     return sizeof(beast_word_t) * (1 + ((bits - 1) / sizeof(beast_word_t)));
@@ -137,7 +137,7 @@ static int beast_mm_allocate(void *shmaddr, int size)
 
 static int beast_mm_deallocate(void *shmaddr, int offset)
 {
-	beast_header_t *header;   /* header of shared memory segment */
+    beast_header_t *header;   /* header of shared memory segment */
     beast_block_t *cur;       /* the new block to insert */
     beast_block_t *prv;       /* the block before cur */
     beast_block_t *nxt;       /* the block after cur */
@@ -184,36 +184,36 @@ static int beast_mm_deallocate(void *shmaddr, int offset)
  */
 int beast_mm_init(int block_size)
 {
-	beast_header_t *header;
-	beast_block_t *block;
-	void *shmaddr;
-	
-	if (beast_mm_initialized) {
-		return 0;
-	}
-	
-	beast_mm_locker = beast_locker_create();
-	if (beast_mm_locker == -1) {
-		return -1;
-	}
-	
-	if (block_size < BEAST_SEGMENT_DEFAULT_SIZE) {
-		beast_mm_block_size = BEAST_SEGMENT_DEFAULT_SIZE;
-	} else {
-		beast_mm_block_size = block_size;
-	}
-	
-	shmaddr = beast_mm_block = (void *)mmap(NULL, beast_mm_block_size,
-	       PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
-	if (!beast_mm_block) {
-		return -1;
-	}
-	
-	header = (beast_header_t *)beast_mm_block;
-	header->segsize = beast_mm_block_size;
+    beast_header_t *header;
+    beast_block_t *block;
+    void *shmaddr;
+    
+    if (beast_mm_initialized) {
+        return 0;
+    }
+    
+    beast_mm_locker = beast_locker_create();
+    if (beast_mm_locker == -1) {
+        return -1;
+    }
+    
+    if (block_size < BEAST_SEGMENT_DEFAULT_SIZE) {
+        beast_mm_block_size = BEAST_SEGMENT_DEFAULT_SIZE;
+    } else {
+        beast_mm_block_size = block_size;
+    }
+    
+    shmaddr = beast_mm_block = (void *)mmap(NULL, beast_mm_block_size,
+           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+    if (!beast_mm_block) {
+        return -1;
+    }
+    
+    header = (beast_header_t *)beast_mm_block;
+    header->segsize = beast_mm_block_size;
     header->avail = beast_mm_block_size - sizeof(beast_header_t) - 
         sizeof(beast_block_t) - beast_mm_alignmem(sizeof(int)); /* avail size */
-	
+    
     /* the free list head block node */
     block = _BLOCKAT(sizeof(beast_header_t));
     block->size = 0;
@@ -224,20 +224,20 @@ int beast_mm_init(int block_size)
     block->size = header->avail;
     block->next = 0;
     
-	beast_mm_initialized = 1;
-	
-	return 0;
+    beast_mm_initialized = 1;
+    
+    return 0;
 }
 
 
 void *beast_mm_malloc(int size)
 {
-	int offset;
-	void *p = NULL;
-	
-	beast_locker_lock(beast_mm_locker);
-	
-	offset = beast_mm_allocate(beast_mm_block, size);
+    int offset;
+    void *p = NULL;
+    
+    beast_locker_lock(beast_mm_locker);
+    
+    offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
     }
@@ -250,12 +250,12 @@ void *beast_mm_malloc(int size)
 
 void *beast_mm_calloc(int size)
 {
-	int offset;
-	void *p = NULL;
-	
-	beast_locker_lock(beast_mm_locker);
-	
-	offset = beast_mm_allocate(beast_mm_block, size);
+    int offset;
+    void *p = NULL;
+    
+    beast_locker_lock(beast_mm_locker);
+    
+    offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
     }
@@ -270,27 +270,27 @@ void *beast_mm_calloc(int size)
 
 void beast_mm_free(void *p)
 {
-	int offset = (unsigned int)((char *)p - (char *)beast_mm_block);
-	
-	beast_locker_lock(beast_mm_locker);
-	beast_mm_deallocate(beast_mm_block, offset);
-	beast_locker_unlock(beast_mm_locker);
+    int offset = (unsigned int)((char *)p - (char *)beast_mm_block);
+    
+    beast_locker_lock(beast_mm_locker);
+    beast_mm_deallocate(beast_mm_block, offset);
+    beast_locker_unlock(beast_mm_locker);
 }
 
 
 int beast_mm_availspace()
 {
-	beast_header_t *header = (beast_header_t *)beast_mm_block;
-	return header->avail;
+    beast_header_t *header = (beast_header_t *)beast_mm_block;
+    return header->avail;
 }
 
 
 void beast_mm_destroy()
 {
-	if (beast_mm_initialized) {
-		munmap(beast_mm_block, beast_mm_block_size);
-		beast_locker_destroy(beast_mm_locker);
-		beast_mm_initialized = 0;
-	}
+    if (beast_mm_initialized) {
+        munmap(beast_mm_block, beast_mm_block_size);
+        beast_locker_destroy(beast_mm_locker);
+        beast_mm_initialized = 0;
+    }
 }
 

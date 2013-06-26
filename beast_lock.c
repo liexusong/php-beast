@@ -33,7 +33,7 @@ union semun {
 
 int beast_sem_create(int initval)
 {
-	int semid;
+    int semid;
     union semun arg;
     key_t key = IPC_PRIVATE;
 
@@ -54,7 +54,7 @@ int beast_sem_create(int initval)
 
 int beast_sem_lock(int semid)
 {
-	struct sembuf op;
+    struct sembuf op;
 
     op.sem_num = 0;
     op.sem_op  = -1;   /* we want alloc 1 sem */
@@ -68,7 +68,7 @@ int beast_sem_lock(int semid)
 
 int beast_sem_unlock(int semid)
 {
-	struct sembuf op;
+    struct sembuf op;
 
     op.sem_num = 0;
     op.sem_op  = 1;
@@ -82,6 +82,6 @@ int beast_sem_unlock(int semid)
 
 int beast_sem_destroy(int semid)
 {
-	union semun arg;
+    union semun arg;
     semctl(semid, 0, IPC_RMID, arg);
 }
