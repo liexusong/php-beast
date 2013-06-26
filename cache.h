@@ -2,17 +2,17 @@
 #define __BEAST_CACHE_H
 
 typedef struct cache_key_s {
-	int device;
-	int inode;
-	int mtime;
-	int fsize;
+    int device;
+    int inode;
+    int mtime;
+    int fsize;
 } cache_key_t;
 
 
 typedef struct cache_item_s {
-	cache_key_t key;
-	struct cache_item_s *next;
-	char data[0];
+    cache_key_t key;
+    struct cache_item_s *next;
+    char data[0];
 } cache_item_t;
 
 

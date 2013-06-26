@@ -31,7 +31,7 @@ static cache_item_t **beast_cache_buckets = NULL;
 static beast_locker_t beast_cache_locker;
 
 
-static int beast_cache_hash(cache_key_t *key)
+static inline int beast_cache_hash(cache_key_t *key)
 {
     return key->device * 3 + key->inode * 7;
 }
@@ -51,11 +51,14 @@ int beast_cache_init(int size)
     
     beast_cache_locker = beast_locker_create();
     if (beast_cache_locker == -1) {
+        beast_mm_destroy();
         return -1;
     }
     
     beast_cache_buckets = beast_mm_malloc(sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
     if (!beast_cache_buckets) {
+        beast_locker_destroy(beast_cache_locker);
+        beast_mm_destroy();
         return -1;
     }
     
@@ -90,7 +93,7 @@ cache_item_t *beast_cache_find(cache_key_t *key)
     if (item && item->key.mtime < key->mtime) /* cache exprie */
     {
         temp = beast_cache_buckets[index];
-        if (temp == item) { /* first node */
+        if (temp == item) { /* header */
             beast_cache_buckets[index] = NULL;
         } else {
             while (temp->next != item)
@@ -112,9 +115,13 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
 {
     cache_item_t *item, *next;
     int i, msize;
-    
+
     msize = sizeof(*item) + size;
-    
+
+    if (msize >= beast_mm_realspace()) {
+        return NULL;
+    }
+
     item = beast_mm_malloc(msize);
     if (!item)
     {

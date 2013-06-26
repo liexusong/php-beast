@@ -285,6 +285,13 @@ int beast_mm_availspace()
 }
 
 
+int beast_mm_realspace()
+{
+	beast_header_t *header = (beast_header_t *)beast_mm_block;
+    return header->segsize;
+}
+
+
 void beast_mm_destroy()
 {
     if (beast_mm_initialized) {

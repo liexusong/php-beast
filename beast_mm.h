@@ -6,6 +6,7 @@ void *beast_mm_malloc(int size);
 void *beast_mm_calloc(int size);
 void beast_mm_free(void *p);
 int beast_mm_availspace();
+int beast_mm_realspace();
 void beast_mm_destroy();
 
 #endif
