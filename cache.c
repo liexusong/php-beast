@@ -93,10 +93,10 @@ cache_item_t *beast_cache_find(cache_key_t *key)
     if (item && item->key.mtime < key->mtime) /* cache exprie */
     {
         temp = beast_cache_buckets[index];
-        if (temp == item) { /* header */
-            beast_cache_buckets[index] = NULL;
+        if (temp == item) { /* the header node */
+            beast_cache_buckets[index] = item->next;
         } else {
-            while (temp->next != item)
+            while (temp->next != item) /* find prev node */
                 temp = temp->next;
             temp->next = item->next;
         }
@@ -118,7 +118,7 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
 
     msize = sizeof(*item) + size;
 
-    if (msize >= beast_mm_realspace()) {
+    if (msize >= beast_mm_realspace()) { /* size too big */
         return NULL;
     }
 
@@ -126,7 +126,8 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
     if (!item)
     {
         beast_locker_lock(beast_cache_locker);
-        
+
+        /* free some spaces */
         for (i = 0; i < BUCKETS_DEFAULT_SIZE; i++) {
             if (beast_mm_availspace() >= msize) {
                 break;
@@ -169,24 +170,35 @@ cache_item_t *beast_cache_push(cache_item_t *item)
 {
     int hashval = beast_cache_hash(&item->key);
     int index = hashval % BUCKETS_DEFAULT_SIZE;
-    cache_item_t **this;
+    cache_item_t **this, *self;
     
-    beast_locker_lock(beast_cache_locker);
+    beast_locker_lock(beast_cache_locker); /* lock */
     
     this = &beast_cache_buckets[index];
     while (*this) {
-        /* this item was exists */
-        if (!memcmp(&(*this)->key, &item->key, sizeof(cache_key_t))) {
-            beast_mm_free(item);
-            item = *this;
-            break;
+        self = *this;
+        /* the same files */
+        if (self->key.device == item->key.device &&
+             self->key.inode == item->key.inode)
+        {
+            if (self->key.mtime >= item->key.mtime) {
+                beast_mm_free(item);
+                beast_locker_unlock(beast_cache_locker); /* unlock */
+                return self;
+            } else { /* do replace */
+                item->next = self->next;
+                beast_mm_free(self);
+                *this = item;
+                beast_locker_unlock(beast_cache_locker); /* unlock */
+                return item;
+            }
         }
-        this = &(*this)->next;
+        this = &self->next;
     }
-    
+
     *this = item;
     
-    beast_locker_unlock(beast_cache_locker);
+    beast_locker_unlock(beast_cache_locker); /* unlock */
     
     return item;
 }
@@ -211,15 +223,15 @@ int beast_cache_destroy()
             item = next;
         }
     }
-    beast_mm_free(beast_cache_buckets);
     
+    beast_mm_free(beast_cache_buckets);
     beast_mm_destroy();
     
     beast_locker_unlock(beast_cache_locker);
     beast_locker_destroy(beast_cache_locker);
-    
+
     beast_cache_initialization = 0;
-    
+
     return 0;
 }
 
@@ -229,9 +241,9 @@ void beast_cache_info(zval *retval)
     char key[128];
     int i;
     cache_item_t *item;
-    
+
     beast_locker_lock(beast_cache_locker);
-    
+
     for (i = 0; i < BUCKETS_DEFAULT_SIZE; i++) {
         item = beast_cache_buckets[i];
         while (item) {
@@ -240,6 +252,6 @@ void beast_cache_info(zval *retval)
             item = item->next;
         }
     }
-    
+
     beast_locker_unlock(beast_cache_locker);
 }
