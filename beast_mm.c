@@ -17,7 +17,7 @@
 #define MAP_NOSYNC 0
 #endif
 
-#define BEAST_SEGMENT_DEFAULT_SIZE (1024 * 1024)
+#define BEAST_SEGMENT_DEFAULT_SIZE (256 * 1024)
 
 #define _BLOCKAT(offset)   ((beast_block_t *)((char *)shmaddr + (offset)))
 #define _OFFSET(block)     ((int)(((char *)(block)) - (char *)shmaddr))
@@ -143,7 +143,7 @@ static int beast_mm_deallocate(void *shmaddr, int offset)
     beast_block_t *nxt;       /* the block after cur */
     int size;                 /* size of deallocated block */
 
-    offset -= beast_mm_alignmem(sizeof(int));
+    offset -= beast_mm_alignmem(sizeof(int)); /* real offset */
 
     /* find position of new block in free list */
     prv = _BLOCKAT(sizeof(beast_header_t));
@@ -278,6 +278,33 @@ void beast_mm_free(void *p)
 }
 
 
+void beast_mm_flush()
+{
+    beast_header_t *header;
+    beast_block_t *block;
+    void *shmaddr;
+
+    beast_locker_lock(beast_mm_locker);
+
+    shmaddr = beast_mm_block;
+    header = (beast_header_t *)shmaddr;
+    header->avail = beast_mm_block_size - sizeof(beast_header_t) - 
+        sizeof(beast_block_t) - beast_mm_alignmem(sizeof(int));
+
+    /* the free list head block node */
+    block = _BLOCKAT(sizeof(beast_header_t));
+    block->size = 0;
+    block->next = sizeof(beast_header_t) + sizeof(beast_block_t);
+
+    /* the avail block */
+    block = _BLOCKAT(block->next);
+    block->size = header->avail;
+    block->next = 0;
+
+    beast_locker_unlock(beast_mm_locker);
+}
+
+
 int beast_mm_availspace()
 {
     beast_header_t *header = (beast_header_t *)beast_mm_block;
@@ -300,4 +327,3 @@ void beast_mm_destroy()
         beast_mm_initialized = 0;
     }
 }
-

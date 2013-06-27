@@ -125,25 +125,17 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
     item = beast_mm_malloc(msize);
     if (!item)
     {
+        int nsize;
+        
         beast_locker_lock(beast_cache_locker);
 
-        /* free some spaces */
-        for (i = 0; i < BUCKETS_DEFAULT_SIZE; i++) {
-            if (beast_mm_availspace() >= msize) {
-                break;
-            }
-            
-            item = beast_cache_buckets[i];
-            while (item) {
-                next = item->next;
-                beast_mm_free(item);
-                item = next;
-            }
-            beast_cache_buckets[i] = NULL;
-        }
+        beast_mm_flush(); /* clean all caches */
         
+        beast_cache_buckets = beast_mm_calloc(sizeof(cache_item_t *) 
+                        * BUCKETS_DEFAULT_SIZE);
+
         beast_locker_unlock(beast_cache_locker);
-        
+
         item = beast_mm_malloc(msize);
         if (!item) {
             return NULL;

@@ -38,7 +38,7 @@
 ZEND_DECLARE_MODULE_GLOBALS(beast)
 */
 
-#define DEFAULT_CACHE_SIZE (5 * 1024 * 1024)
+#define DEFAULT_CACHE_SIZE  5242880
 
 zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 
