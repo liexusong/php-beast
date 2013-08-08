@@ -38,7 +38,7 @@
 ZEND_DECLARE_MODULE_GLOBALS(beast)
 */
 
-#define DEFAULT_CACHE_SIZE  5242880
+#define DEFAULT_CACHE_SIZE  1048576
 
 zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 
@@ -82,7 +82,7 @@ zend_module_entry beast_module_entry = {
     PHP_RSHUTDOWN(beast),    /* Replace with NULL if there's nothing to do at request end */
     PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-    "0.3", /* Replace with version number for your extension */
+    "0.5", /* Replace with version number for your extension */
 #endif
     STANDARD_MODULE_PROPERTIES
 };
@@ -91,6 +91,29 @@ zend_module_entry beast_module_entry = {
 #ifdef COMPILE_DL_BEAST
 ZEND_GET_MODULE(beast)
 #endif
+
+
+#define CHR1  0xe8
+#define CHR2  0x16
+#define CHR3  0xa4
+#define CHR4  0x0c
+
+#define swab32(x)                                        \
+     ((x & 0x000000FF) << 24 | (x & 0x0000FF00) << 8 |   \
+      (x & 0x00FF0000) >> 8 | (x & 0xFF000000) >> 24)
+
+
+#define little_endian()  (!big_endian())
+
+static int big_endian()
+{
+    unsigned short num = 0x1122;
+
+    if(*((unsigned char *)&num) == 0x11) {
+        return 1;
+    }
+    return 0;
+}
 
 
 /*****************************************************************************
@@ -130,7 +153,18 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
     }
     
     fcount = fsize / 8 + 1;
-    *((int *)&header[0]) = 0xe816a40c;
+
+    header[0] = CHR1;
+    header[1] = CHR2;
+    header[2] = CHR3;
+    header[3] = CHR4;
+
+    /* if computer is little endian, change file size to big endian */
+
+    if (little_endian()) {
+        fsize = swab32(fsize);
+    }
+
     *((int *)&header[4]) = fsize;
 
     php_stream_write(output_stream, header, 8);
@@ -194,47 +228,55 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
     
     /* not found cache */
     
-    if ((php_stream_read(stream, header, 8) != 8) ||
-        *((int *)&header[0]) != 0xe816a40c)
+    if (php_stream_read(stream, header, 8) != 8 ||
+         header[0] != CHR1 || header[1] != CHR2 ||
+         header[2] != CHR3 || header[3] != CHR4)
     {
         php_stream_pclose(stream);
         return -1;
     }
     
     fsize = *((int *)&header[4]);
+
+    /* if computer is little endian, change file size to little endian */
+
+    if (little_endian()) {
+        fsize = swab32(fsize);
+    }
+
     bsize = fsize / 8 + 1; /* block count */
     msize = bsize * 8 + 3;
-    
+
     ckey.fsize = fsize; /* set file size */
-    
+
     citem = beast_cache_create(&ckey, msize);
     if (!citem) {
         php_stream_pclose(stream);
         return -1;
     }
-    
+
     text = beast_cache_cdata(citem);
-    
+
     /* For closing php script environment " ?>" */
     text[0] = ' ';
     text[1] = '?';
     text[2] = '>';
-    
+
     script = &text[3];
     for (i = 0; i < bsize; i++) {
         php_stream_read(stream, input, 8);
         DES_decipher(input, &(script[i * 8]), key);
     }
-    
+
     php_stream_pclose(stream);
-    
+
     citem = beast_cache_push(citem); /* push into cache item to manager */
-    
+
     *buffer = beast_cache_cdata(citem);
     *filesize = beast_cache_fsize(citem) + 3;
-    
+
     cache_miss++;
-    
+
     return 0;
 }
 
@@ -292,23 +334,10 @@ ZEND_INI_MH(php_beast_cache_size)
 }
 
 PHP_INI_BEGIN()
-    PHP_INI_ENTRY("beast.cache_size", "5242880", PHP_INI_ALL, php_beast_cache_size) 
+    PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL, php_beast_cache_size) 
 PHP_INI_END()
 
 /* }}} */
-
-/* {{{ php_beast_init_globals
- */
-/* Uncomment this function if you have INI entries
-static void php_beast_init_globals(zend_beast_globals *beast_globals)
-{
-    beast_globals->global_value = 0;
-    beast_globals->global_string = NULL;
-}
-*/
-/* }}} */
-
-
 
 
 /* {{{ PHP_MINIT_FUNCTION
