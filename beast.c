@@ -225,17 +225,17 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
         cache_hits++;
         return 0;
     }
-    
+
     /* not found cache */
-    
+
     if (php_stream_read(stream, header, 8) != 8 ||
-         header[0] != CHR1 || header[1] != CHR2 ||
-         header[2] != CHR3 || header[3] != CHR4)
+         (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
+         (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
     {
         php_stream_pclose(stream);
         return -1;
     }
-    
+
     fsize = *((int *)&header[4]);
 
     /* if computer is little endian, change file size to little endian */
@@ -310,14 +310,6 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
     return new_op_array;
 }
 
-/* {{{ PHP_INI
- */
-/* Remove comments and fill if you need to have entries in php.ini
-PHP_INI_BEGIN()
-    STD_PHP_INI_ENTRY("beast.global_value",      "42", PHP_INI_ALL, OnUpdateLong, global_value, zend_beast_globals, beast_globals)
-    STD_PHP_INI_ENTRY("beast.global_string", "foobar", PHP_INI_ALL, OnUpdateString, global_string, zend_beast_globals, beast_globals)
-PHP_INI_END()
-*/
 
 ZEND_INI_MH(php_beast_cache_size) 
 {
@@ -400,9 +392,8 @@ PHP_MINFO_FUNCTION(beast)
 /* }}} */
 
 
-/* Every user-visible function in PHP should document itself in the source */
-/* {{{ proto string confirm_beast_compiled(string arg)
-   Return a string to confirm that the module is compiled in */
+/* {{{ PHP extern functions */
+
 PHP_FUNCTION(beast_encode_file)
 {
     char *input, *output;
