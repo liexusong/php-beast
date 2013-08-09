@@ -287,7 +287,7 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
     zval pv;
     zend_op_array *new_op_array;
     
-    if (decrypt_file_return_buffer(h->filename, authkey, &script, 
+    if (decrypt_file_return_buffer(h->filename, __authkey, &script, 
             &fsize TSRMLS_CC) != 0)
     {
         return old_compile_file(h, type TSRMLS_CC);
@@ -419,7 +419,7 @@ PHP_FUNCTION(beast_encode_file)
     memcpy(otmp, output, output_len);
     otmp[output_len] = 0;
 
-    retval = encrypt_file(itmp, otmp, authkey TSRMLS_CC);
+    retval = encrypt_file(itmp, otmp, __authkey TSRMLS_CC);
     
     free(itmp);
     free(otmp);
