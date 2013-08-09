@@ -38,6 +38,8 @@
 ZEND_DECLARE_MODULE_GLOBALS(beast)
 */
 
+extern char __authkey[];
+
 #define DEFAULT_CACHE_SIZE  1048576
 
 zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
@@ -45,10 +47,6 @@ zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 /*
  * authkey, you can change it.
  */
-static char authkey[8] = {
-    0x01, 0x1f, 0x01, 0x1f,
-    0x01, 0x0e, 0x01, 0x0e
-};
 
 /* True global resources - no need for thread safety here */
 static int le_beast;
