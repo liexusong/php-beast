@@ -98,7 +98,7 @@ ZEND_GET_MODULE(beast)
 
 #define swab32(x)                                        \
      ((x & 0x000000FF) << 24 | (x & 0x0000FF00) << 8 |   \
-      (x & 0x00FF0000) >> 8 | (x & 0xFF000000) >> 24)
+      (x & 0x00FF0000) >>  8 | (x & 0xFF000000) >> 24)
 
 
 #define little_endian()  (!big_endian())
@@ -124,14 +124,15 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
 {
     php_stream *input_stream, *output_stream;
     php_stream_statbuf stat_ssb;
-    int fsize, fcount, i;
+    int file_size, block_count, i;
     char input[8], output[8];
     char header[8];
-    
+
     /* Open input file */
     input_stream = php_stream_open_wrapper(inputfile, "r",
         ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
     if (!input_stream) {
+        php_printf("PHP Fatal error: Unable to open `%s'", inputfile);
         return -1;
     }
 
@@ -140,17 +141,23 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
         php_stream_pclose(input_stream);
         return -1;
     }
-    fsize = stat_ssb.sb.st_size;
+
+    file_size = stat_ssb.sb.st_size;
+    if (file_size <= 0) {
+        php_stream_pclose(input_stream);
+        return -1;
+    }
 
     /* Open output file */
     output_stream = php_stream_open_wrapper(outputfile, "w+",
         ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
     if (!output_stream) {
+        php_printf("PHP Fatal error: Unable to open `%s'", outputfile);
         php_stream_pclose(input_stream);
         return -1;
     }
-    
-    fcount = fsize / 8 + 1;
+
+    block_count = file_size / 8 + 1;
 
     header[0] = CHR1;
     header[1] = CHR2;
@@ -160,23 +167,24 @@ int encrypt_file(const char *inputfile, const char *outputfile, const char *key 
     /* if computer is little endian, change file size to big endian */
 
     if (little_endian()) {
-        fsize = swab32(fsize);
+        file_size = swab32(file_size);
     }
 
-    *((int *)&header[4]) = fsize;
+    *((int *)&header[4]) = file_size;
 
     php_stream_write(output_stream, header, 8);
-    
-    for (i = 0; i < fcount; i++)
+
+    for (i = 0; i < block_count; i++)
     {
         memset(input, 0, 8);
         (void)php_stream_read(input_stream, input, 8);
         DES_encipher(input, output, key);
         php_stream_write(output_stream, output, 8);
     }
-    
+
     php_stream_pclose(input_stream);
     php_stream_pclose(output_stream);
+
     return 0;
 }
 
@@ -424,8 +432,10 @@ PHP_FUNCTION(beast_encode_file)
     free(itmp);
     free(otmp);
     
-    if (retval == -1)
+    if (retval == -1) {
         RETURN_FALSE;
+    }
+
     RETURN_TRUE;
 }
 
