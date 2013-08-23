@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 
 #include "beast_lock.h"
+#include "beast_log.h"
 
 #ifndef MAP_NOSYNC
 #define MAP_NOSYNC 0
@@ -191,39 +192,43 @@ int beast_mm_init(int block_size)
     if (beast_mm_initialized) {
         return 0;
     }
-    
+
     beast_mm_locker = beast_locker_create();
     if (beast_mm_locker == -1) {
+        beast_write_log(beast_log_error, "Unable create memory "
+                                         "manager locker for beast");
         return -1;
     }
-    
+
     if (block_size < BEAST_SEGMENT_DEFAULT_SIZE) {
         beast_mm_block_size = BEAST_SEGMENT_DEFAULT_SIZE;
     } else {
         beast_mm_block_size = block_size;
     }
-    
+
     shmaddr = beast_mm_block = (void *)mmap(NULL, beast_mm_block_size,
            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
     if (!beast_mm_block) {
+        beast_write_log(beast_log_error, "Unable create share "
+                                         "memory for beast");
         return -1;
     }
-    
+
     header = (beast_header_t *)beast_mm_block;
     header->segsize = beast_mm_block_size;
     header->avail = beast_mm_block_size - sizeof(beast_header_t) - 
         sizeof(beast_block_t) - beast_mm_alignmem(sizeof(int)); /* avail size */
-    
+
     /* the free list head block node */
     block = _BLOCKAT(sizeof(beast_header_t));
     block->size = 0;
     block->next = sizeof(beast_header_t) + sizeof(beast_block_t);
-    
+
     /* the avail block */
     block = _BLOCKAT(block->next);
     block->size = header->avail;
     block->next = 0;
-    
+
     beast_mm_initialized = 1;
     
     return 0;

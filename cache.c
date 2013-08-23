@@ -21,6 +21,7 @@
 #include "beast_lock.h"
 #include "php.h"
 #include "cache.h"
+#include "beast_log.h"
 
 
 #define BUCKETS_DEFAULT_SIZE 1021
@@ -51,23 +52,27 @@ int beast_cache_init(int size)
     
     beast_cache_locker = beast_locker_create();
     if (beast_cache_locker == -1) {
+        beast_write_log(beast_log_error, "Unable create cache "
+                                         "locker for beast");
         beast_mm_destroy();
         return -1;
     }
     
-    beast_cache_buckets = beast_mm_malloc(sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
+    beast_cache_buckets = beast_mm_malloc(sizeof(cache_item_t *) * 
+          BUCKETS_DEFAULT_SIZE);
     if (!beast_cache_buckets) {
+        beast_write_log(beast_log_error, "Unable alloc memory for beast");
         beast_locker_destroy(beast_cache_locker);
         beast_mm_destroy();
         return -1;
     }
-    
+
     for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
         beast_cache_buckets[index] = NULL;
     }
-    
+
     beast_cache_initialization = 1;
-    
+
     return 0;
 }
 
@@ -239,7 +244,8 @@ void beast_cache_info(zval *retval)
     for (i = 0; i < BUCKETS_DEFAULT_SIZE; i++) {
         item = beast_cache_buckets[i];
         while (item) {
-            sprintf(key, "{device(%d)#inode(%d)}", item->key.device, item->key.inode);
+            sprintf(key, "{device(%d)#inode(%d)}",
+                  item->key.device, item->key.inode);
             add_assoc_long(retval, key, item->key.fsize);
             item = item->next;
         }

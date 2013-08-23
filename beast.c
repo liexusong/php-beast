@@ -34,21 +34,21 @@
 #include "cache.h"
 #include "encrypt.h"
 
-/* If you declare any globals in php_beast.h uncomment this:
-ZEND_DECLARE_MODULE_GLOBALS(beast)
-*/
-
-extern char __authkey[];
 
 #define DEFAULT_CACHE_SIZE  1048576
 
-zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
+
+extern char __authkey[];
 
 /*
- * authkey, you can change it.
+ * Global vaiables for extension
  */
 
+char *beast_log_file;
+
 /* True global resources - no need for thread safety here */
+static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
+
 static int le_beast;
 static int max_cache_size = DEFAULT_CACHE_SIZE;
 static int cache_hits = 0;
@@ -120,7 +120,8 @@ static int big_endian()
 *                                                                            *
 *****************************************************************************/
 
-int encrypt_file(const char *inputfile, const char *outputfile, const char *key TSRMLS_DC)
+int encrypt_file(const char *inputfile, const char *outputfile, 
+    const char *key TSRMLS_DC)
 {
     php_stream *input_stream, *output_stream;
     php_stream_statbuf stat_ssb;
@@ -331,8 +332,26 @@ ZEND_INI_MH(php_beast_cache_size)
     return SUCCESS;
 }
 
+ZEND_INI_MH(php_beast_log_file)
+{
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    beast_log_file = strdup(new_value);
+    if (beast_log_file == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+}
+
+
 PHP_INI_BEGIN()
-    PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL, php_beast_cache_size) 
+    PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL,
+          php_beast_cache_size)
+    PHP_INI_ENTRY("beast.log_file", "/home/beast.log", PHP_INI_ALL,
+          php_beast_log_file)
 PHP_INI_END()
 
 /* }}} */
