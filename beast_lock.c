@@ -29,7 +29,7 @@ static inline int __do_lock(beast_locker_t *locker, int type)
 }
 
 
-beast_locker_t *beast_locker_create_with_path(char *path)
+beast_locker_t *beast_locker_create(char *path)
 {
     beast_locker_t *locker;
     int fd;
