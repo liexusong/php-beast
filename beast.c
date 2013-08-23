@@ -33,6 +33,7 @@
 #include "php_beast.h"
 #include "cache.h"
 #include "encrypt.h"
+#include "beast_log.h"
 
 
 #define DEFAULT_CACHE_SIZE  1048576
@@ -45,6 +46,7 @@ extern char __authkey[];
  */
 
 char *beast_log_file;
+char *beast_lock_path;
 
 /* True global resources - no need for thread safety here */
 static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
@@ -318,6 +320,8 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 }
 
 
+/* Configure entries */
+
 ZEND_INI_MH(php_beast_cache_size) 
 {
     if (new_value_length == 0) { 
@@ -346,12 +350,28 @@ ZEND_INI_MH(php_beast_log_file)
     return SUCCESS;
 }
 
+ZEND_INI_MH(php_beast_lock_path)
+{
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    beast_lock_path = strdup(new_value);
+    if (beast_lock_path == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+}
+
 
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL,
           php_beast_cache_size)
     PHP_INI_ENTRY("beast.log_file", "/home/beast.log", PHP_INI_ALL,
           php_beast_log_file)
+    PHP_INI_ENTRY("beast.lock_path", "/home/", PHP_INI_ALL,
+          php_beast_lock_path)
 PHP_INI_END()
 
 /* }}} */
@@ -363,14 +383,15 @@ PHP_MINIT_FUNCTION(beast)
 {
     /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
-    
+
     if (beast_cache_init(max_cache_size) == -1) {
+        beast_write_log(beast_log_error, "Unable initialize cache for beast");
         return FAILURE;
     }
-    
+
     old_compile_file = zend_compile_file;
     zend_compile_file = my_compile_file;
-    
+
     return SUCCESS;
 }
 /* }}} */

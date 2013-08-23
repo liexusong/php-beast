@@ -18,7 +18,7 @@ void beast_write_log(beast_log_level level, const char *fmt, ...)
         return;
     }
 
-    fp = fopen(beast_log_file, "w+");
+    fp = fopen(beast_log_file, "a+");
     if (!fp) {
         return;
     }

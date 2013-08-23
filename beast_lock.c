@@ -1,87 +1,94 @@
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#include <sys/stat.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
 #include <unistd.h>
+#include <fcntl.h>
 #include <errno.h>
 
-#ifndef HAVE_SEMUN
-union semun {
-    int val;                  /* value for SETVAL */
-    struct semid_ds *buf;     /* buffer for IPC_STAT, IPC_SET */
-    unsigned short *array;    /* array for GETALL, SETALL */
-                              /* Linux specific part: */
-    struct seminfo *__buf;    /* buffer for IPC_INFO */
-};
-#endif
+#include "beast_lock.h"
+#include "beast_log.h"
 
-#ifndef SEM_R
-# define SEM_R 0444
-#endif
-#ifndef SEM_A
-# define SEM_A 0222
-#endif
 
-/* always use SEM_UNDO, otherwise we risk deadlock */
-#define USE_SEM_UNDO
+static inline int __do_lock(beast_locker_t *locker, int type)
+{ 
+    int ret;
+    struct flock lock;
 
-#ifdef USE_SEM_UNDO
-# define UNDO SEM_UNDO
-#else
-# define UNDO 0
-#endif
+    lock.l_type = type;
+    lock.l_start = 0;
+    lock.l_whence = SEEK_SET;
+    lock.l_len = 1;
+    lock.l_pid = 0;
 
-int beast_sem_create(int initval)
+    do {
+        ret = fcntl(locker->fd, F_SETLKW, &lock);
+    } while (ret < 0 && errno == EINTR);
+
+    return ret;
+}
+
+
+beast_locker_t *beast_locker_create_with_path(char *path)
 {
-    int semid;
-    union semun arg;
-    key_t key = IPC_PRIVATE;
+    beast_locker_t *locker;
+    int fd;
 
-    if ((semid = semget(key, 1, IPC_CREAT | IPC_EXCL | 0777)) >= 0) {
-        arg.val = initval;
-        if (semctl(semid, 0, SETVAL, arg) < 0) {
-            return -1;
-        }
-    } else if (errno == EEXIST) {
-        if ((semid = semget(key, 1, 0777)) < 0) {
-            return -1;
-        }
-    } else {
-        return -1;
+    locker = malloc(sizeof(beast_locker_t));
+    if (!locker) {
+        return NULL;
     }
-    return semid;
-}
 
-int beast_sem_lock(int semid)
-{
-    struct sembuf op;
-
-    op.sem_num = 0;
-    op.sem_op  = -1;   /* we want alloc 1 sem */
-    op.sem_flg = UNDO;
-
-    if (semop(semid, &op, 1) < 0) {
-        return -1;
+    fd = open(path, O_RDWR|O_CREAT, 0666);
+    if (fd == -1) {
+        free(locker);
+        return NULL;
     }
-    return 0;
-}
 
-int beast_sem_unlock(int semid)
-{
-    struct sembuf op;
+    locker->fd = fd;
+    locker->path = strdup(path);
 
-    op.sem_num = 0;
-    op.sem_op  = 1;
-    op.sem_flg = UNDO;
-
-    if (semop(semid, &op, 1) < 0) {
-        return -1;
+    if (!locker->path) {
+        close(fd);
+        free(locker);
+        return NULL;
     }
-    return 0;
+
+    return locker;
 }
 
-int beast_sem_destroy(int semid)
-{
-    union semun arg;
-    semctl(semid, 0, IPC_RMID, arg);
+
+void beast_locker_wrlock(beast_locker_t *locker)
+{   
+    if (__do_lock(locker, F_WRLCK) < 0) {
+        beast_write_log(beast_log_notice,
+              "beast_locker_wrlock failed errno(%d)", errno);
+    }
 }
+
+
+void beast_locker_rdlock(beast_locker_t *locker)
+{   
+    if (__do_lock(locker, F_RDLCK) < 0) {
+        beast_write_log(beast_log_notice,
+              "beast_locker_rdlock failed errno(%d)", errno);
+    }
+}
+
+
+void beast_locker_unlock(beast_locker_t *locker)
+{   
+    if (__do_lock(locker, F_UNLCK) < 0) {
+        beast_write_log(beast_log_notice,
+              "beast_locker_unlock failed errno(%d)", errno);
+    }
+}
+
+
+void beast_locker_destroy(beast_locker_t *locker)
+{
+    close(locker->fd);
+    free(locker->path);
+    free(locker);
+}
+

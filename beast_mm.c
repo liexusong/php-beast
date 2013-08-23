@@ -44,7 +44,7 @@ typedef struct beast_block_s {
 static int beast_mm_initialized = 0;
 static void *beast_mm_block = NULL;
 static int beast_mm_block_size = 0;
-static beast_locker_t beast_mm_locker;
+static beast_locker_t *beast_mm_locker;
 
 
 /*
@@ -188,12 +188,15 @@ int beast_mm_init(int block_size)
     beast_header_t *header;
     beast_block_t *block;
     void *shmaddr;
-    
+    char lock_file[512];
+
     if (beast_mm_initialized) {
         return 0;
     }
 
-    beast_mm_locker = beast_locker_create();
+    sprintf(lock_file, "%s.beast.mlock", beast_lock_path);
+
+    beast_mm_locker = beast_locker_create(lock_file);
     if (beast_mm_locker == -1) {
         beast_write_log(beast_log_error, "Unable create memory "
                                          "manager locker for beast");

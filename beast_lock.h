@@ -1,16 +1,19 @@
 #ifndef __BEAST_LOCK_H
 #define __BEAST_LOCK_H
 
-int beast_sem_create(int initval);
-int beast_sem_lock(int semid);
-int beast_sem_unlock(int semid);
-int beast_sem_destroy(int semid);
+typedef struct {
+    int fd;
+    char *path;
+} beast_locker_t;
 
-typedef int beast_locker_t;
+extern char *beast_lock_path;
 
-#define beast_locker_create()         beast_sem_create(1)
-#define beast_locker_lock(locker)     beast_sem_lock(locker)
-#define beast_locker_unlock(locker)   beast_sem_unlock(locker)
-#define beast_locker_destroy(locker)  beast_sem_destroy(locker)
+beast_locker_t *beast_locker_create(char *path);
+void beast_locker_wrlock(beast_locker_t *locker);
+void beast_locker_rdlock(beast_locker_t *locker);
+void beast_locker_unlock(beast_locker_t *locker);
+void beast_locker_destroy(beast_locker_t *locker);
+
+#define beast_locker_lock(locker)  beast_locker_wrlock(locker)
 
 #endif

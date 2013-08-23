@@ -9,4 +9,4 @@ typedef enum {
 
 void beast_write_log(beast_log_level level, const char *fmt, ...);
 
-#endif;
+#endif
