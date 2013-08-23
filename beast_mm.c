@@ -212,6 +212,7 @@ int beast_mm_init(int block_size)
     shmaddr = beast_mm_block = (void *)mmap(NULL, beast_mm_block_size,
            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
     if (!beast_mm_block) {
+        beast_locker_destroy(beast_mm_locker);
         beast_write_log(beast_log_error, "Unable create share "
                                          "memory for beast");
         return -1;

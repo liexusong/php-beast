@@ -88,6 +88,7 @@ void beast_locker_unlock(beast_locker_t *locker)
 void beast_locker_destroy(beast_locker_t *locker)
 {
     close(locker->fd);
+    unlink(locker->path);
     free(locker->path);
     free(locker);
 }
