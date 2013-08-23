@@ -38,7 +38,8 @@ $ sudo make && make install
 配置项:
 +---------------------------------------------+
 | beast.cache_size = size                     |
-| beast.log_file = "log_file_path"            |
+| beast.log_file = "path_to_log"              |
+| beast.lock_path = "path_to_locker"          |
 +---------------------------------------------+
 
 TODO:
