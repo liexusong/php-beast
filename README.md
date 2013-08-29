@@ -33,20 +33,16 @@ $ sudo make && make install
 编译好之后修改php.ini配置文件, 加入配置项: extension=beast.so, 重启php-fpm
 
 <pre><code>
-+---------------------------------------------+
-|  温馨提示: 1) 缓存设置越大, 效率越高        |
-|            2) 可以修改key.c文件中的加密key  |
-+---------------------------------------------+
+  温馨提示: 1) 缓存设置越大, 效率越高
+            2) 可以修改key.c文件中的加密key
 </code></pre>
 
 
 配置项:
 <pre><code>
-+---------------------------------------------+
-| beast.cache_size = size                     |
-| beast.log_file = "path_to_log"              |
-| beast.lock_path = "path_to_locker"          |
-+---------------------------------------------+
+ beast.cache_size = size
+ beast.log_file = "path_to_log"
+ beast.lock_path = "path_to_locker"
 </code></pre>
 
 TODO:
