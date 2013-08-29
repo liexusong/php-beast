@@ -322,17 +322,70 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 
 /* Configure entries */
 
+void beast_atoi(const char *str, int *ret, int *len)
+{
+    const char *ptr = str;
+    char ch;
+    int absolute = 1;
+    int rlen, result;
+
+    ch = *ptr;
+
+    if (ch == '-') {
+        absolute = -1;
+        ++ptr;
+    } else if (ch == '+') {
+        absolute = 1;
+        ++ptr;
+    }
+
+    for (rlen = 0, result = 0; *ptr != '\0'; ptr++) {
+        ch = *ptr;
+
+        if (ch >= '0' && ch <= '9') {
+            result = result * 10 + (ch - '0');
+            rlen++;
+        } else {
+            break;
+        }
+    }
+
+    if (ret) *ret = absolute * result;
+    if (len) *len = rlen;
+}
+
 ZEND_INI_MH(php_beast_cache_size) 
 {
+    int len;
+
     if (new_value_length == 0) { 
         return FAILURE;
     }
-    
-    max_cache_size = atoi(new_value);
-    if (max_cache_size <= 0) {
-        max_cache_size = DEFAULT_CACHE_SIZE;
+
+    beast_atoi(new_value, &max_cache_size, &len);
+
+    if (len > 0 && len < new_value_length) { /* have unit */
+        switch (new_value[len]) {
+        case 'k':
+        case 'K':
+            max_cache_size *= 1024;
+            break;
+        case 'm':
+        case 'M':
+            max_cache_size *= 1024 * 1024;
+            break;
+        case 'g':
+        case 'G':
+            max_cache_size *= 1024 * 1024 * 1024;
+            break;
+        default:
+            return FAILURE;
+        }
+
+    } else if (len == 0) { /*failed */
+        return FAILURE;
     }
-    
+
     return SUCCESS;
 }
 
