@@ -78,8 +78,8 @@ zend_module_entry beast_module_entry = {
     beast_functions,
     PHP_MINIT(beast),
     PHP_MSHUTDOWN(beast),
-    PHP_RINIT(beast),        /* Replace with NULL if there's nothing to do at request start */
-    PHP_RSHUTDOWN(beast),    /* Replace with NULL if there's nothing to do at request end */
+    PHP_RINIT(beast),
+    PHP_RSHUTDOWN(beast),
     PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
     "0.5", /* Replace with version number for your extension */
@@ -503,9 +503,9 @@ PHP_FUNCTION(beast_encode_file)
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss", &input, 
             &input_len, &output, &output_len TSRMLS_CC) == FAILURE)
     {
-        return;
+        RETURN_FALSE;
     }
-    
+
     itmp = malloc(input_len + 1);
     otmp = malloc(output_len + 1);
     if (!itmp || !otmp) {
@@ -513,18 +513,18 @@ PHP_FUNCTION(beast_encode_file)
         if (otmp) free(otmp);
         RETURN_FALSE;
     }
-    
+
     memcpy(itmp, input, input_len);
     itmp[input_len] = 0;
-    
+
     memcpy(otmp, output, output_len);
     otmp[output_len] = 0;
 
     retval = encrypt_file(itmp, otmp, __authkey TSRMLS_CC);
-    
+
     free(itmp);
     free(otmp);
-    
+
     if (retval == -1) {
         RETURN_FALSE;
     }
