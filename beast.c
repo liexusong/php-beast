@@ -55,6 +55,7 @@ static int le_beast;
 static int max_cache_size = DEFAULT_CACHE_SIZE;
 static int cache_hits = 0;
 static int cache_miss = 0;
+static int beast_enable = 1;
 
 /* {{{ beast_functions[]
  *
@@ -261,6 +262,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
     citem = beast_cache_create(&ckey, msize);
     if (!citem) {
         php_stream_pclose(stream);
+        beast_write_log(beast_log_error, "Unable alloc memory for cache");
         return -1;
     }
 
@@ -417,6 +419,21 @@ ZEND_INI_MH(php_beast_lock_path)
     return SUCCESS;
 }
 
+ZEND_INI_MH(php_beast_enable)
+{
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    if (!strcasecmp(new_value, "on")) {
+        beast_enable = 1;
+    } else {
+        beast_enable = 0;
+    }
+
+    return SUCCESS;
+}
+
 
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL,
@@ -425,6 +442,8 @@ PHP_INI_BEGIN()
           php_beast_log_file)
     PHP_INI_ENTRY("beast.lock_path", "/home/", PHP_INI_ALL,
           php_beast_lock_path)
+    PHP_INI_ENTRY("beast.enable", "On", PHP_INI_ALL,
+          php_beast_enable)
 PHP_INI_END()
 
 /* }}} */
@@ -436,6 +455,10 @@ PHP_MINIT_FUNCTION(beast)
 {
     /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
+
+    if (!beast_enable) {
+        return SUCCESS;
+    }
 
     if (beast_cache_init(max_cache_size) == -1) {
         beast_write_log(beast_log_error, "Unable initialize cache for beast");
@@ -455,6 +478,15 @@ PHP_MSHUTDOWN_FUNCTION(beast)
 {
     /* uncomment this line if you have INI entries */
     UNREGISTER_INI_ENTRIES();
+    
+    if (!beast_enable) {
+        return SUCCESS;
+    }
+
+    beast_cache_destroy();
+
+    zend_compile_file = old_compile_file;
+
     return SUCCESS;
 }
 /* }}} */
@@ -536,6 +568,7 @@ PHP_FUNCTION(beast_encode_file)
 PHP_FUNCTION(beast_avail_cache)
 {
     int size = beast_mm_availspace();
+
     RETURN_LONG(size);
 }
 
@@ -543,7 +576,9 @@ PHP_FUNCTION(beast_avail_cache)
 PHP_FUNCTION(beast_cache_info)
 {
     array_init(return_value);
+
     beast_cache_info(return_value);
+
     add_assoc_long(return_value, "cache_hits", cache_hits);
     add_assoc_long(return_value, "cache_miss", cache_miss);
 }

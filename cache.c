@@ -208,13 +208,13 @@ int beast_cache_destroy()
 {
     int index;
     cache_item_t *item, *next;
-    
+
     if (!beast_cache_initialization) {
         return 0;
     }
-    
+
     beast_locker_lock(beast_cache_locker);
-    
+
     for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
         item = beast_cache_buckets[index];
         while (item) {
@@ -223,10 +223,10 @@ int beast_cache_destroy()
             item = next;
         }
     }
-    
+
     beast_mm_free(beast_cache_buckets);
     beast_mm_destroy();
-    
+
     beast_locker_unlock(beast_cache_locker);
     beast_locker_destroy(beast_cache_locker);
 
