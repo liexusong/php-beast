@@ -440,7 +440,7 @@ PHP_INI_BEGIN()
           php_beast_cache_size)
     PHP_INI_ENTRY("beast.log_file", "/home/beast.log", PHP_INI_ALL,
           php_beast_log_file)
-    PHP_INI_ENTRY("beast.lock_path", "/home/", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.lock_path", "/tmp/", PHP_INI_ALL,
           php_beast_lock_path)
     PHP_INI_ENTRY("beast.enable", "On", PHP_INI_ALL,
           php_beast_enable)
