@@ -83,15 +83,17 @@ static int beast_mm_allocate(void *shmaddr, int size)
      */
     header = (beast_header_t *)shmaddr;
     if (header->avail < realsize) {
+        beast_write_log(beast_log_error, "Not enough memory for alloc()");
         return -1;
     }
 
-    prvbestfit = 0;
+    prvbestfit = 0;    /* best block prev's node */
     minsize = INT_MAX;
 
-    prv = _BLOCKAT(sizeof(beast_header_t));
+    prv = _BLOCKAT(sizeof(beast_header_t)); /* free list header */
+
     while (prv->next != 0) {
-        cur = _BLOCKAT(prv->next);
+        cur = _BLOCKAT(prv->next); /* current active block */
         if (cur->size == realsize) {
             prvbestfit = prv;
             break;
@@ -105,7 +107,7 @@ static int beast_mm_allocate(void *shmaddr, int size)
         prv = cur;
     }
 
-    if (prvbestfit == 0) {
+    if (prvbestfit == 0) { /* not found best block */
         return -1;
     }
 
@@ -144,7 +146,7 @@ static int beast_mm_deallocate(void *shmaddr, int offset)
     beast_block_t *nxt;       /* the block after cur */
     int size;                 /* size of deallocated block */
 
-    offset -= beast_mm_alignmem(sizeof(int)); /* real offset */
+    offset -= beast_mm_alignmem(sizeof(int)); /* really offset */
 
     /* find position of new block in free list */
     prv = _BLOCKAT(sizeof(beast_header_t));
@@ -271,16 +273,23 @@ void *beast_mm_calloc(int size)
     
     beast_locker_unlock(beast_mm_locker);
 
-    if (NULL != p)
+    if (NULL != p) {
         memset(p, 0, size);
+    }
+
     return p;
 }
 
 
 void beast_mm_free(void *p)
 {
-    int offset = (unsigned int)((char *)p - (char *)beast_mm_block);
-    
+    int offset;
+
+    offset = (unsigned int)((char *)p - (char *)beast_mm_block);
+    if (offset <= 0) {
+        return;
+    }
+
     beast_locker_lock(beast_mm_locker);
     beast_mm_deallocate(beast_mm_block, offset);
     beast_locker_unlock(beast_mm_locker);
@@ -298,7 +307,7 @@ void beast_mm_flush()
     shmaddr = beast_mm_block;
     header = (beast_header_t *)shmaddr;
     header->avail = beast_mm_block_size - sizeof(beast_header_t) - 
-        sizeof(beast_block_t) - beast_mm_alignmem(sizeof(int));
+             sizeof(beast_block_t) - beast_mm_alignmem(sizeof(int));
 
     /* the free list head block node */
     block = _BLOCKAT(sizeof(beast_header_t));
@@ -314,20 +323,34 @@ void beast_mm_flush()
 }
 
 
+/*
+ * Get the avail's memory space
+ */
 int beast_mm_availspace()
 {
+    int size;
     beast_header_t *header = (beast_header_t *)beast_mm_block;
-    return header->avail;
+
+    beast_locker_lock(beast_mm_locker);
+    size = header->avail;
+    beast_locker_unlock(beast_mm_locker);
+
+    return size;
 }
 
 
+/*
+ * Don't locked here, because the segsize not change forever
+ */
 int beast_mm_realspace()
 {
-    beast_header_t *header = (beast_header_t *)beast_mm_block;
-    return header->segsize;
+    return ((beast_header_t *)beast_mm_block)->segsize;
 }
 
 
+/*
+ * Destroy memory's manager
+ */
 void beast_mm_destroy()
 {
     if (beast_mm_initialized) {

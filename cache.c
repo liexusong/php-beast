@@ -122,11 +122,13 @@ cache_item_t *beast_cache_find(cache_key_t *key)
 cache_item_t *beast_cache_create(cache_key_t *key, int size)
 {
     cache_item_t *item, *next;
-    int i, msize;
+    int i, msize, bsize;
 
     msize = sizeof(*item) + size;
+    bsize = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
 
-    if (msize >= beast_mm_realspace()) { /* size too big */
+    if ((msize + bsize) > beast_mm_realspace()) {
+        beast_write_log(beast_log_error, "Cache item size too big");
         return NULL;
     }
 
@@ -139,8 +141,7 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
 
         beast_mm_flush(); /* clean all caches */
         
-        beast_cache_buckets = beast_mm_calloc(sizeof(cache_item_t *) 
-                        * BUCKETS_DEFAULT_SIZE);
+        beast_cache_buckets = beast_mm_calloc(bsize);
 
         beast_locker_unlock(beast_cache_locker);
 
