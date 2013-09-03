@@ -14,7 +14,7 @@
 
 使用方法:
 =========
-修改beast.c文件的authkey加密key, 编译安装,
+修改key.c文件的__authkey加密key, 编译安装,
 接着使用beast_encode_file()函数进行加密,
 加密后的文件beast模块能自动识别.
 
