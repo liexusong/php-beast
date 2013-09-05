@@ -32,7 +32,6 @@ void beast_write_log(beast_log_level level, const char *fmt, ...)
 
     va_start(ap, fmt);
 
-    fprintf(fp, "%s ", );
     vfprintf(fp, fmt, ap);
     fprintf(fp, "\n");
     fflush(fp);
