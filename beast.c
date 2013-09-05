@@ -517,7 +517,6 @@ PHP_MINFO_FUNCTION(beast)
     php_info_print_table_header(2, "beast support", "enabled");
     php_info_print_table_end();
 
-    /* Remove comments if you have entries in php.ini */
     DISPLAY_INI_ENTRIES();
 }
 /* }}} */

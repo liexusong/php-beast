@@ -23,7 +23,7 @@ static inline int __do_lock(beast_locker_t *locker, int type)
 
     do {
         ret = fcntl(locker->fd, F_SETLKW, &lock);
-    } while (ret < 0 && errno == EINTR);
+    } while (ret < 0 && (errno == EINTR || errno == EAGAIN));
 
     return ret;
 }
