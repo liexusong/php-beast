@@ -12,7 +12,7 @@
 
 static inline int __do_lock(beast_locker_t *locker, int type)
 { 
-    int ret;
+    int ret, tries = 10;
     struct flock lock;
 
     lock.l_type = type;
@@ -23,7 +23,9 @@ static inline int __do_lock(beast_locker_t *locker, int type)
 
     do {
         ret = fcntl(locker->fd, F_SETLKW, &lock);
-    } while (ret < 0 && (errno == EINTR || errno == EAGAIN));
+        tries--;
+    } while (ret < 0 && tries > 0 && 
+             (errno == EINTR || errno == EAGAIN));
 
     return ret;
 }
@@ -58,30 +60,36 @@ beast_locker_t *beast_locker_create(char *path)
 }
 
 
-void beast_locker_wrlock(beast_locker_t *locker)
+int beast_locker_wrlock(beast_locker_t *locker)
 {   
     if (__do_lock(locker, F_WRLCK) < 0) {
         beast_write_log(beast_log_notice,
               "beast_locker_wrlock failed errno(%d)", errno);
+        return -1;
     }
+    return 0;
 }
 
 
-void beast_locker_rdlock(beast_locker_t *locker)
+int beast_locker_rdlock(beast_locker_t *locker)
 {   
     if (__do_lock(locker, F_RDLCK) < 0) {
         beast_write_log(beast_log_notice,
               "beast_locker_rdlock failed errno(%d)", errno);
+        return -1;
     }
+    return 0;
 }
 
 
-void beast_locker_unlock(beast_locker_t *locker)
+int beast_locker_unlock(beast_locker_t *locker)
 {   
     if (__do_lock(locker, F_UNLCK) < 0) {
         beast_write_log(beast_log_notice,
               "beast_locker_unlock failed errno(%d)", errno);
+        return -1;
     }
+    return 0;
 }
 
 
@@ -92,4 +100,3 @@ void beast_locker_destroy(beast_locker_t *locker)
     free(locker->path);
     free(locker);
 }
-

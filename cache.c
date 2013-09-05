@@ -86,7 +86,11 @@ cache_item_t *beast_cache_find(cache_key_t *key)
     int index = hashval % BUCKETS_DEFAULT_SIZE;
     cache_item_t *item, *temp;
     
-    beast_locker_rdlock(beast_cache_locker); /* read lock */
+    if (beast_locker_rdlock(beast_cache_locker) == -1) {
+        beast_write_log(beast_log_error,
+                        "Unable call beast_cache_find(), failed to get locker");
+        return NULL;
+    }
     
     item = beast_cache_buckets[index];
     while (item) {
@@ -112,9 +116,9 @@ cache_item_t *beast_cache_find(cache_key_t *key)
         beast_mm_free(item);
         item = NULL;
     }
-    
+
     beast_locker_unlock(beast_cache_locker);
-    
+
     return item;
 }
 
@@ -137,7 +141,11 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
     {
         int nsize;
         
-        beast_locker_lock(beast_cache_locker);
+        if (beast_locker_lock(beast_cache_locker) == -1) {
+            beast_write_log(beast_log_error,
+                      "Unable call beast_cache_create(), failed to get locker");
+            return NULL;
+        }
 
         beast_mm_flush(); /* clean all caches */
         
@@ -173,7 +181,11 @@ cache_item_t *beast_cache_push(cache_item_t *item)
     int index = hashval % BUCKETS_DEFAULT_SIZE;
     cache_item_t **this, *self;
     
-    beast_locker_lock(beast_cache_locker); /* lock */
+    if (beast_locker_lock(beast_cache_locker) == -1) {
+        beast_write_log(beast_log_error,
+                        "Unable call beast_cache_push(), failed to get locker");
+        return NULL;
+    }
     
     this = &beast_cache_buckets[index];
     while (*this) {
@@ -214,7 +226,11 @@ int beast_cache_destroy()
         return 0;
     }
 
-    beast_locker_lock(beast_cache_locker);
+    if (beast_locker_lock(beast_cache_locker) == -1) {
+        beast_write_log(beast_log_error,
+                     "Unable call beast_cache_destroy(), failed to get locker");
+        return NULL;
+    }
 
     for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
         item = beast_cache_buckets[index];
@@ -225,11 +241,11 @@ int beast_cache_destroy()
         }
     }
 
-    beast_mm_free(beast_cache_buckets);
-    beast_mm_destroy();
-
     beast_locker_unlock(beast_cache_locker);
     beast_locker_destroy(beast_cache_locker);
+
+    beast_mm_free(beast_cache_buckets);
+    beast_mm_destroy();
 
     beast_cache_initialization = 0;
 
@@ -243,7 +259,11 @@ void beast_cache_info(zval *retval)
     int i;
     cache_item_t *item;
 
-    beast_locker_rdlock(beast_cache_locker); /* read lock */
+    if (beast_locker_rdlock(beast_cache_locker) == -1) {
+        beast_write_log(beast_log_error,
+                        "Unable call beast_cache_info(), failed to get locker");
+        return;
+    }
 
     for (i = 0; i < BUCKETS_DEFAULT_SIZE; i++) {
         item = beast_cache_buckets[i];

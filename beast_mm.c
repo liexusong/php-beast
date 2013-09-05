@@ -246,8 +246,12 @@ void *beast_mm_malloc(int size)
     int offset;
     void *p = NULL;
     
-    beast_locker_lock(beast_mm_locker);
-    
+    if (beast_locker_lock(beast_mm_locker) == -1) {
+        beast_write_log(beast_log_notice,
+              "beast_mm_malloc() failed, unable get locker");
+        return NULL;
+    }
+
     offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
@@ -264,13 +268,17 @@ void *beast_mm_calloc(int size)
     int offset;
     void *p = NULL;
     
-    beast_locker_lock(beast_mm_locker);
-    
+    if (beast_locker_lock(beast_mm_locker) == -1) {
+        beast_write_log(beast_log_notice,
+              "beast_mm_calloc() failed, unable get locker");
+        return NULL;
+    }
+
     offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
     }
-    
+
     beast_locker_unlock(beast_mm_locker);
 
     if (NULL != p) {
@@ -281,28 +289,39 @@ void *beast_mm_calloc(int size)
 }
 
 
-void beast_mm_free(void *p)
+int beast_mm_free(void *p)
 {
     int offset;
 
     offset = (unsigned int)((char *)p - (char *)beast_mm_block);
     if (offset <= 0) {
-        return;
+        return -1;
     }
 
-    beast_locker_lock(beast_mm_locker);
+    if (beast_locker_lock(beast_mm_locker) == -1) {
+        beast_write_log(beast_log_notice,
+              "beast_mm_free() failed, unable get locker");
+        return -1;
+    }
+
     beast_mm_deallocate(beast_mm_block, offset);
+
     beast_locker_unlock(beast_mm_locker);
+    return 0;
 }
 
 
-void beast_mm_flush()
+int beast_mm_flush()
 {
     beast_header_t *header;
     beast_block_t *block;
     void *shmaddr;
 
-    beast_locker_lock(beast_mm_locker);
+    if (beast_locker_lock(beast_mm_locker) == -1) {
+        beast_write_log(beast_log_notice,
+              "beast_mm_flush() failed, unable get locker");
+        return -1;
+    }
 
     shmaddr = beast_mm_block;
     header = (beast_header_t *)shmaddr;
@@ -320,6 +339,8 @@ void beast_mm_flush()
     block->next = 0;
 
     beast_locker_unlock(beast_mm_locker);
+
+    return 0;
 }
 
 
@@ -331,7 +352,12 @@ int beast_mm_availspace()
     int size;
     beast_header_t *header = (beast_header_t *)beast_mm_block;
 
-    beast_locker_lock(beast_mm_locker);
+    if (beast_locker_lock(beast_mm_locker) == -1) {
+        beast_write_log(beast_log_notice,
+              "beast_mm_availspace() failed, unable get locker");
+        return -1;
+    }
+
     size = header->avail;
     beast_locker_unlock(beast_mm_locker);
 
