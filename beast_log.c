@@ -9,11 +9,9 @@ extern char *beast_log_file;
 
 void beast_write_log(beast_log_level level, const char *fmt, ...)
 {
-    char *headers[] = {"{debug}", "{notice}", "{error}"};
+    char *headers[] = {"[debug]", "[notice]", "[error]"};
     va_list ap;
     FILE *fp;
-    time_t now;
-    char buf[64];
 
     if (level > beast_log_error ||
         level < beast_log_debug) {
@@ -25,13 +23,9 @@ void beast_write_log(beast_log_level level, const char *fmt, ...)
         return;
     }
 
-    now = time(NULL);
-    strftime(buf, sizeof(buf), "%d %b %H:%M:%S", localtime(&now));
-
-    fprintf(fp, "[%s] %s ", buf, headers[level]);
-
     va_start(ap, fmt);
 
+    fprintf(fp, "%s ", headers[level]);
     vfprintf(fp, fmt, ap);
     fprintf(fp, "\n");
     fflush(fp);

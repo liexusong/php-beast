@@ -196,10 +196,10 @@ int beast_mm_init(int block_size)
         return 0;
     }
 
-    sprintf(lock_file, "%s.beast.mlock", beast_lock_path);
+    sprintf(lock_file, "%s/beast.mlock", beast_lock_path);
 
     beast_mm_locker = beast_locker_create(lock_file);
-    if (beast_mm_locker == -1) {
+    if (beast_mm_locker == NULL) {
         beast_write_log(beast_log_error, "Unable create memory "
                                          "manager locker for beast");
         return -1;
@@ -212,7 +212,7 @@ int beast_mm_init(int block_size)
     }
 
     shmaddr = beast_mm_block = (void *)mmap(NULL, beast_mm_block_size,
-           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+                              PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANON, -1, 0);
     if (!beast_mm_block) {
         beast_locker_destroy(beast_mm_locker);
         beast_write_log(beast_log_error, "Unable create share "
@@ -246,12 +246,8 @@ void *beast_mm_malloc(int size)
     int offset;
     void *p = NULL;
     
-    if (beast_locker_lock(beast_mm_locker) == -1) {
-        beast_write_log(beast_log_notice,
-              "beast_mm_malloc() failed, unable get locker");
-        return NULL;
-    }
-
+    beast_locker_lock(beast_mm_locker);
+    
     offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
@@ -268,17 +264,13 @@ void *beast_mm_calloc(int size)
     int offset;
     void *p = NULL;
     
-    if (beast_locker_lock(beast_mm_locker) == -1) {
-        beast_write_log(beast_log_notice,
-              "beast_mm_calloc() failed, unable get locker");
-        return NULL;
-    }
-
+    beast_locker_lock(beast_mm_locker);
+    
     offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
     }
-
+    
     beast_locker_unlock(beast_mm_locker);
 
     if (NULL != p) {
@@ -289,39 +281,28 @@ void *beast_mm_calloc(int size)
 }
 
 
-int beast_mm_free(void *p)
+void beast_mm_free(void *p)
 {
     int offset;
 
     offset = (unsigned int)((char *)p - (char *)beast_mm_block);
     if (offset <= 0) {
-        return -1;
+        return;
     }
 
-    if (beast_locker_lock(beast_mm_locker) == -1) {
-        beast_write_log(beast_log_notice,
-              "beast_mm_free() failed, unable get locker");
-        return -1;
-    }
-
+    beast_locker_lock(beast_mm_locker);
     beast_mm_deallocate(beast_mm_block, offset);
-
     beast_locker_unlock(beast_mm_locker);
-    return 0;
 }
 
 
-int beast_mm_flush()
+void beast_mm_flush()
 {
     beast_header_t *header;
     beast_block_t *block;
     void *shmaddr;
 
-    if (beast_locker_lock(beast_mm_locker) == -1) {
-        beast_write_log(beast_log_notice,
-              "beast_mm_flush() failed, unable get locker");
-        return -1;
-    }
+    beast_locker_lock(beast_mm_locker);
 
     shmaddr = beast_mm_block;
     header = (beast_header_t *)shmaddr;
@@ -339,8 +320,6 @@ int beast_mm_flush()
     block->next = 0;
 
     beast_locker_unlock(beast_mm_locker);
-
-    return 0;
 }
 
 
@@ -352,12 +331,7 @@ int beast_mm_availspace()
     int size;
     beast_header_t *header = (beast_header_t *)beast_mm_block;
 
-    if (beast_locker_lock(beast_mm_locker) == -1) {
-        beast_write_log(beast_log_notice,
-              "beast_mm_availspace() failed, unable get locker");
-        return -1;
-    }
-
+    beast_locker_lock(beast_mm_locker);
     size = header->avail;
     beast_locker_unlock(beast_mm_locker);
 

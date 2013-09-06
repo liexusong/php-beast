@@ -17,6 +17,9 @@
 */
 
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+
 #include "beast_mm.h"
 #include "beast_lock.h"
 #include "php.h"
@@ -40,7 +43,7 @@ static inline int beast_cache_hash(cache_key_t *key)
 
 int beast_cache_init(int size)
 {
-    int index;
+    int index, bucket_size;
     char lock_file[512];
 
     if (beast_cache_initialization) {
@@ -51,18 +54,19 @@ int beast_cache_init(int size)
         return -1;
     }
 
-    sprintf(lock_file, "%s.beast.clock", beast_lock_path);
+    sprintf(lock_file, "%s/beast.clock", beast_lock_path);
 
     beast_cache_locker = beast_locker_create(lock_file);
-    if (beast_cache_locker == -1) {
+    if (beast_cache_locker == NULL) {
         beast_write_log(beast_log_error, "Unable create cache "
                                          "locker for beast");
         beast_mm_destroy();
         return -1;
     }
 
-    beast_cache_buckets = beast_mm_malloc(sizeof(cache_item_t *) * 
-          BUCKETS_DEFAULT_SIZE);
+    bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
+    beast_cache_buckets = (cache_item_t **)mmap(NULL, bucket_size,
+                              PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANON, -1, 0);
     if (!beast_cache_buckets) {
         beast_write_log(beast_log_error, "Unable alloc memory for beast");
         beast_locker_destroy(beast_cache_locker);
@@ -86,11 +90,7 @@ cache_item_t *beast_cache_find(cache_key_t *key)
     int index = hashval % BUCKETS_DEFAULT_SIZE;
     cache_item_t *item, *temp;
     
-    if (beast_locker_rdlock(beast_cache_locker) == -1) {
-        beast_write_log(beast_log_error,
-                        "Unable call beast_cache_find(), failed to get locker");
-        return NULL;
-    }
+    beast_locker_rdlock(beast_cache_locker); /* read lock */
     
     item = beast_cache_buckets[index];
     while (item) {
@@ -116,9 +116,9 @@ cache_item_t *beast_cache_find(cache_key_t *key)
         beast_mm_free(item);
         item = NULL;
     }
-
+    
     beast_locker_unlock(beast_cache_locker);
-
+    
     return item;
 }
 
@@ -139,17 +139,16 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
     item = beast_mm_malloc(msize);
     if (!item)
     {
-        int nsize;
+        int index;
         
-        if (beast_locker_lock(beast_cache_locker) == -1) {
-            beast_write_log(beast_log_error,
-                      "Unable call beast_cache_create(), failed to get locker");
-            return NULL;
-        }
+        beast_locker_lock(beast_cache_locker);
 
         beast_mm_flush(); /* clean all caches */
         
         beast_cache_buckets = beast_mm_calloc(bsize);
+        for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
+            beast_cache_buckets[index] = NULL;
+        }
 
         beast_locker_unlock(beast_cache_locker);
 
@@ -181,12 +180,9 @@ cache_item_t *beast_cache_push(cache_item_t *item)
     int index = hashval % BUCKETS_DEFAULT_SIZE;
     cache_item_t **this, *self;
     
-    if (beast_locker_lock(beast_cache_locker) == -1) {
-        beast_write_log(beast_log_error,
-                        "Unable call beast_cache_push(), failed to get locker");
-        return NULL;
-    }
-    
+    beast_locker_lock(beast_cache_locker); /* lock */
+
+#if 0
     this = &beast_cache_buckets[index];
     while (*this) {
         self = *this;
@@ -210,7 +206,11 @@ cache_item_t *beast_cache_push(cache_item_t *item)
     }
 
     *this = item;
-    
+#endif
+
+    item->next = beast_cache_buckets[index];
+    beast_cache_buckets[index] = item;
+
     beast_locker_unlock(beast_cache_locker); /* unlock */
     
     return item;
@@ -226,11 +226,7 @@ int beast_cache_destroy()
         return 0;
     }
 
-    if (beast_locker_lock(beast_cache_locker) == -1) {
-        beast_write_log(beast_log_error,
-                     "Unable call beast_cache_destroy(), failed to get locker");
-        return NULL;
-    }
+    beast_locker_lock(beast_cache_locker);
 
     for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
         item = beast_cache_buckets[index];
@@ -241,11 +237,11 @@ int beast_cache_destroy()
         }
     }
 
-    beast_locker_unlock(beast_cache_locker);
-    beast_locker_destroy(beast_cache_locker);
-
     beast_mm_free(beast_cache_buckets);
     beast_mm_destroy();
+
+    beast_locker_unlock(beast_cache_locker);
+    beast_locker_destroy(beast_cache_locker);
 
     beast_cache_initialization = 0;
 
@@ -259,11 +255,7 @@ void beast_cache_info(zval *retval)
     int i;
     cache_item_t *item;
 
-    if (beast_locker_rdlock(beast_cache_locker) == -1) {
-        beast_write_log(beast_log_error,
-                        "Unable call beast_cache_info(), failed to get locker");
-        return;
-    }
+    beast_locker_rdlock(beast_cache_locker); /* read lock */
 
     for (i = 0; i < BUCKETS_DEFAULT_SIZE; i++) {
         item = beast_cache_buckets[i];

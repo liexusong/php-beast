@@ -411,10 +411,17 @@ ZEND_INI_MH(php_beast_lock_path)
         return FAILURE;
     }
 
-    beast_lock_path = strdup(new_value);
+    while (new_value[new_value_length] == '/') {
+        new_value_length--;
+    }
+
+    beast_lock_path = malloc(new_value_length + 1);
     if (beast_lock_path == NULL) {
         return FAILURE;
     }
+
+    memcpy(beast_lock_path, new_value, new_value_length);
+    beast_lock_path[new_value_length] = '\0';
 
     return SUCCESS;
 }
@@ -438,7 +445,7 @@ ZEND_INI_MH(php_beast_enable)
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL,
           php_beast_cache_size)
-    PHP_INI_ENTRY("beast.log_file", "/home/beast.log", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.log_file", "/tmp/beast.log", PHP_INI_ALL,
           php_beast_log_file)
     PHP_INI_ENTRY("beast.lock_path", "/tmp/", PHP_INI_ALL,
           php_beast_lock_path)
