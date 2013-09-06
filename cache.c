@@ -142,15 +142,14 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
         int index;
         
         beast_locker_lock(beast_cache_locker);
-
-        beast_mm_flush(); /* clean all caches */
         
-        beast_cache_buckets = beast_mm_calloc(bsize);
         for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
             beast_cache_buckets[index] = NULL;
         }
 
         beast_locker_unlock(beast_cache_locker);
+
+        beast_mm_flush(); /* clean all caches */
 
         item = beast_mm_malloc(msize);
         if (!item) {
