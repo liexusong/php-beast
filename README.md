@@ -45,6 +45,11 @@ $ sudo make && make install
  beast.lock_path = "path_to_locker"
 </code></pre>
 
+通过测试环境:
+<pre><code>
+ Nginx + Fastcgi + (PHP-5.3.x/PHP-5.2.x)
+</code></pre>
+
 TODO:
 -----
 * 增加opcode缓存
