@@ -136,7 +136,8 @@ int encrypt_file(const char *inputfile, const char *outputfile,
     input_stream = php_stream_open_wrapper(inputfile, "r",
         ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
     if (!input_stream) {
-        php_printf("PHP Fatal error: Unable to open `%s'", inputfile);
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                                         "Unable to open file `%s'", inputfile);
         return -1;
     }
 
@@ -156,7 +157,8 @@ int encrypt_file(const char *inputfile, const char *outputfile,
     output_stream = php_stream_open_wrapper(outputfile, "w+",
         ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
     if (!output_stream) {
-        php_printf("PHP Fatal error: Unable to open `%s'", outputfile);
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                                        "Unable to open file `%s'", outputfile);
         php_stream_pclose(input_stream);
         return -1;
     }
@@ -262,7 +264,8 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
     citem = beast_cache_create(&ckey, msize);
     if (!citem) {
         php_stream_pclose(stream);
-        beast_write_log(beast_log_error, "Unable alloc memory for cache");
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                                               "Unable alloc memory for cache");
         return -1;
     }
 
@@ -467,8 +470,11 @@ PHP_MINIT_FUNCTION(beast)
         return SUCCESS;
     }
 
-    if (beast_cache_init(max_cache_size) == -1) {
-        beast_write_log(beast_log_error, "Unable initialize cache for beast");
+    if (beast_cache_init(max_cache_size) == -1 ||
+        beast_log_init(beast_log_file) == -1)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                                           "Unable initialize cache for beast");
         return FAILURE;
     }
 
@@ -491,6 +497,7 @@ PHP_MSHUTDOWN_FUNCTION(beast)
     }
 
     beast_cache_destroy();
+    beast_log_destroy();
 
     zend_compile_file = old_compile_file;
 
