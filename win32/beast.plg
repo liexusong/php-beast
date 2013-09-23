@@ -1,0 +1,27 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: beast - Win32 Release_TS--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\Users\ADMINI~1\AppData\Local\Temp\RSP854F.tmp" with contents
+[
+kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib php5ts.lib /nologo /dll /incremental:no /pdb:"Release_TS/php_beast.pdb" /machine:I386 /out:"..\..\Release_TS/php_beast.dll" /implib:"Release_TS/php_beast.lib" /libpath:"..\..\Release_TS" /libpath:"..\..\Release_TS_Inline" 
+".\Release_TS\beast.obj"
+".\Release_TS\bit.obj"
+".\Release_TS\encrypt.obj"
+]
+Creating command line "link.exe @C:\Users\ADMINI~1\AppData\Local\Temp\RSP854F.tmp"
+<h3>Output Window</h3>
+Linking...
+   Creating library Release_TS/php_beast.lib and object Release_TS/php_beast.exp
+
+
+
+<h3>Results</h3>
+php_beast.dll - 0 error(s), 0 warning(s)
+</pre>
+</body>
+</html>
