@@ -54,11 +54,15 @@ TODO:
 -----
 * 增加opcode缓存
 
+注意:
+-----
+因为本人不太属性win平台, 所以希望能有win平台的编程高手与本人一起完成win的版本. 有意请联系: 280259971
+
+
 ------------------------------
 作者: 列旭松(280259971@qq.com)
 
 我的著作: http://book.jd.com/11123177.html
-我的团队: 280259971
 定制版本请联系: 280259971
 捐赠本项目: <a href='http://me.alipay.com/liexusong'><img src='https://img.alipay.com/sys/personalprod/style/mc/btn-index.png' /></a>
 ------------------------------
