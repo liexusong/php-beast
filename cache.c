@@ -238,8 +238,6 @@ int beast_cache_destroy()
             item = next;
         }
     }
-
-    beast_mm_free(beast_cache_buckets);
 #endif
 
     beast_mm_destroy();
