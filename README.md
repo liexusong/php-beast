@@ -42,7 +42,6 @@ $ sudo make && make install
 <pre><code>
  beast.cache_size = size
  beast.log_file = "path_to_log"
- beast.lock_path = "path_to_locker"
 </code></pre>
 
 通过测试环境:
