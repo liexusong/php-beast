@@ -49,9 +49,8 @@ extern char __authkey[];
 /*
  * Global vaiables for extension
  */
-
 char *beast_log_file;
-char *beast_lock_path;
+int beast_ncpu;
 
 /* True global resources - no need for thread safety here */
 static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
@@ -88,7 +87,7 @@ zend_module_entry beast_module_entry = {
     PHP_RSHUTDOWN(beast),
     PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-    "1.0", /* Replace with version number for your extension */
+    "1.1", /* Replace with version number for your extension */
 #endif
     STANDARD_MODULE_PROPERTIES
 };
@@ -437,26 +436,6 @@ ZEND_INI_MH(php_beast_log_file)
     return SUCCESS;
 }
 
-ZEND_INI_MH(php_beast_lock_path)
-{
-    if (new_value_length == 0) {
-        return FAILURE;
-    }
-
-    while (new_value[new_value_length] == '/') {
-        new_value_length--;
-    }
-
-    beast_lock_path = malloc(new_value_length + 1);
-    if (beast_lock_path == NULL) {
-        return FAILURE;
-    }
-
-    memcpy(beast_lock_path, new_value, new_value_length);
-    beast_lock_path[new_value_length] = '\0';
-
-    return SUCCESS;
-}
 
 ZEND_INI_MH(php_beast_enable)
 {
@@ -479,8 +458,6 @@ PHP_INI_BEGIN()
           php_beast_cache_size)
     PHP_INI_ENTRY("beast.log_file", "/tmp/beast.log", PHP_INI_ALL,
           php_beast_log_file)
-    PHP_INI_ENTRY("beast.lock_path", "/tmp/", PHP_INI_ALL,
-          php_beast_lock_path)
     PHP_INI_ENTRY("beast.enable", "On", PHP_INI_ALL,
           php_beast_enable)
 PHP_INI_END()
@@ -509,6 +486,11 @@ PHP_MINIT_FUNCTION(beast)
 
     old_compile_file = zend_compile_file;
     zend_compile_file = my_compile_file;
+
+    beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+    if (beast_ncpu <= 0) {
+        beast_ncpu = 1;
+    }
 
     return SUCCESS;
 }

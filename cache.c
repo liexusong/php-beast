@@ -21,7 +21,7 @@
 #include <sys/mman.h>
 
 #include "beast_mm.h"
-#include "beast_lock.h"
+#include "spinlock.h"
 #include "php.h"
 #include "cache.h"
 #include "beast_log.h"
@@ -32,7 +32,7 @@
 
 static int beast_cache_initialization = 0;
 static cache_item_t **beast_cache_buckets = NULL;
-static beast_locker_t *beast_cache_locker;
+static int *cache_lock;
 
 
 static inline int beast_cache_hash(cache_key_t *key)
@@ -44,7 +44,6 @@ static inline int beast_cache_hash(cache_key_t *key)
 int beast_cache_init(int size)
 {
     int index, bucket_size;
-    char lock_file[512];
 
     if (beast_cache_initialization) {
         return 0;
@@ -54,22 +53,23 @@ int beast_cache_init(int size)
         return -1;
     }
 
-    sprintf(lock_file, "%s/beast.clock", beast_lock_path);
-
-    beast_cache_locker = beast_locker_create(lock_file);
-    if (beast_cache_locker == NULL) {
-        beast_write_log(beast_log_error, "Unable create cache "
-                                         "locker for beast");
+    cache_lock = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
+                                               MAP_SHARED | MAP_ANON, -1, 0);
+    if (!cache_lock) {
+        beast_write_log(beast_log_error,
+              "Unable alloc share memory for cache lock");
         beast_mm_destroy();
         return -1;
     }
+    *cache_lock = 0;
 
     bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
     beast_cache_buckets = (cache_item_t **)mmap(NULL, bucket_size,
-                              PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANON, -1, 0);
+                          PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
     if (!beast_cache_buckets) {
-        beast_write_log(beast_log_error, "Unable alloc memory for beast");
-        beast_locker_destroy(beast_cache_locker);
+        beast_write_log(beast_log_error,
+              "Unable alloc share memory for cache buckets");
+        munmap(cache_lock, sizeof(int));
         beast_mm_destroy();
         return -1;
     }
@@ -89,9 +89,10 @@ cache_item_t *beast_cache_find(cache_key_t *key)
     int hashval = beast_cache_hash(key);
     int index = hashval % BUCKETS_DEFAULT_SIZE;
     cache_item_t *item, *temp;
-    
-    beast_locker_rdlock(beast_cache_locker); /* read lock */
-    
+    int pid = (int)getpid();
+
+    beast_spinlock(cache_lock, pid);
+
     item = beast_cache_buckets[index];
     while (item) {
         if (item->key.device == key->device &&
@@ -116,9 +117,9 @@ cache_item_t *beast_cache_find(cache_key_t *key)
         beast_mm_free(item);
         item = NULL;
     }
-    
-    beast_locker_unlock(beast_cache_locker);
-    
+
+    beast_spinunlock(cache_lock, pid);
+
     return item;
 }
 
@@ -127,6 +128,7 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
 {
     cache_item_t *item, *next;
     int i, msize, bsize;
+    int pid = (int)getpid();
 
     msize = sizeof(*item) + size;
     bsize = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
@@ -143,13 +145,13 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
 
         /* clean all caches */
 
-        beast_locker_lock(beast_cache_locker);
+        beast_spinlock(cache_lock, pid);
 
         for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
             beast_cache_buckets[index] = NULL;
         }
 
-        beast_locker_unlock(beast_cache_locker);
+        beast_spinunlock(cache_lock, pid);
 
         beast_mm_flush();
 
@@ -180,8 +182,9 @@ cache_item_t *beast_cache_push(cache_item_t *item)
     int hashval = beast_cache_hash(&item->key);
     int index = hashval % BUCKETS_DEFAULT_SIZE;
     cache_item_t **this, *self;
+    int pid = (int)getpid();
     
-    beast_locker_lock(beast_cache_locker); /* lock */
+    beast_spinlock(cache_lock, pid);
 
 #if 0
     this = &beast_cache_buckets[index];
@@ -193,13 +196,13 @@ cache_item_t *beast_cache_push(cache_item_t *item)
         {
             if (self->key.mtime >= item->key.mtime) {
                 beast_mm_free(item);
-                beast_locker_unlock(beast_cache_locker); /* unlock */
+                beast_spinunlock(cache_lock, pid);
                 return self;
             } else { /* do replace */
                 item->next = self->next;
                 beast_mm_free(self);
                 *this = item;
-                beast_locker_unlock(beast_cache_locker); /* unlock */
+                beast_spinunlock(cache_lock, pid);
                 return item;
             }
         }
@@ -212,7 +215,7 @@ cache_item_t *beast_cache_push(cache_item_t *item)
     item->next = beast_cache_buckets[index];
     beast_cache_buckets[index] = item;
 
-    beast_locker_unlock(beast_cache_locker); /* unlock */
+    beast_spinunlock(cache_lock, pid);
     
     return item;
 }
@@ -222,12 +225,13 @@ int beast_cache_destroy()
 {
     int index;
     cache_item_t *item, *next;
+    int pid = (int)getpid();
 
     if (!beast_cache_initialization) {
         return 0;
     }
 
-    beast_locker_lock(beast_cache_locker);
+    beast_spinlock(cache_lock, pid);
 
 #if 0  /* not need free the item cache, because beast_mm_destroy() would free */
     for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
@@ -245,8 +249,9 @@ int beast_cache_destroy()
     /* free cache buckets's mmap memory */
     munmap(beast_cache_buckets, sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
 
-    beast_locker_unlock(beast_cache_locker);
-    beast_locker_destroy(beast_cache_locker);
+    beast_spinunlock(cache_lock, pid);
+
+    munmap(cache_lock, sizeof(int));
 
     beast_cache_initialization = 0;
 
@@ -259,8 +264,9 @@ void beast_cache_info(zval *retval)
     char key[128];
     int i;
     cache_item_t *item;
+    int pid = (int)getpid();
 
-    beast_locker_rdlock(beast_cache_locker); /* read lock */
+    beast_spinlock(cache_lock, pid);
 
     for (i = 0; i < BUCKETS_DEFAULT_SIZE; i++) {
         item = beast_cache_buckets[i];
@@ -272,6 +278,6 @@ void beast_cache_info(zval *retval)
         }
     }
 
-    beast_locker_unlock(beast_cache_locker);
+    beast_spinunlock(cache_lock, pid);
 }
 
