@@ -53,6 +53,7 @@ int beast_cache_init(int size)
         return -1;
     }
 
+    /* init cache lock */
     cache_lock = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
                                                MAP_SHARED | MAP_ANON, -1, 0);
     if (!cache_lock) {
@@ -63,6 +64,7 @@ int beast_cache_init(int size)
     }
     *cache_lock = 0;
 
+    /* init cache buckets's memory */
     bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
     beast_cache_buckets = (cache_item_t **)mmap(NULL, bucket_size,
                           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
@@ -151,9 +153,9 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
             beast_cache_buckets[index] = NULL;
         }
 
-        beast_spinunlock(cache_lock, pid);
-
         beast_mm_flush();
+
+        beast_spinunlock(cache_lock, pid);
 
         item = beast_mm_malloc(msize);
         if (!item) {
@@ -231,25 +233,10 @@ int beast_cache_destroy()
         return 0;
     }
 
-    beast_spinlock(cache_lock, pid);
-
-#if 0  /* not need free the item cache, because beast_mm_destroy() would free */
-    for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
-        item = beast_cache_buckets[index];
-        while (item) {
-            next = item->next;
-            beast_mm_free(item);
-            item = next;
-        }
-    }
-#endif
-
-    beast_mm_destroy();
+    beast_mm_destroy(); /* destroy memory manager */
 
     /* free cache buckets's mmap memory */
     munmap(beast_cache_buckets, sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
-
-    beast_spinunlock(cache_lock, pid);
 
     munmap(cache_lock, sizeof(int));
 
