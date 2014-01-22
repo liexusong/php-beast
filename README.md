@@ -42,6 +42,7 @@ $ sudo make && make install
 <pre><code>
  beast.cache_size = size
  beast.log_file = "path_to_log"
+ beast.enable = On
 </code></pre>
 
 通过测试环境:
