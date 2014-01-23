@@ -38,7 +38,7 @@ void beast_spinlock(int *lock, int pid)
             for (n = 1; n < 129; n << 1) {
     
                 for (i = 0; i < n; i++) {
-                    __asm ("pause");
+                    __asm__("pause");
                 }
     
                 if (*lock == 0 && 
