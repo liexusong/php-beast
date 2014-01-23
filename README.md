@@ -64,7 +64,7 @@ win32文件夹中是win版本的加密模块, 但是因为没有缓存, 所以�
 作者: 列旭松(280259971@qq.com)
 
 我的著作: http://book.jd.com/11123177.html<br/>
-定制版本请联系: 280259971<br/>
+<b>提供安装配置服务和定制版本, 请联系QQ: 280259971</b><br/>
 捐赠本项目: <a href='http://me.alipay.com/liexusong'><img src='https://img.alipay.com/sys/personalprod/style/mc/btn-index.png' /></a>
 ------------------------------
 
