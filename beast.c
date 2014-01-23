@@ -209,7 +209,7 @@ int encrypt_file(const char *inputfile, const char *outputfile,
 *****************************************************************************/
 
 int decrypt_file_return_buffer(const char *inputfile, const char *key,
-        char **buffer, int *rsize TSRMLS_DC)
+        char **retbuf, int *rsize, int *need_free TSRMLS_DC)
 {
     int stream;
     struct stat stat_ssb;
@@ -218,7 +218,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
     int file_size, block_size, mem_size, i;
     char input[8];
     char header[8];
-    char *text, *script;
+    char *buffer, *script;
 
     /* open file */
     stream = open(inputfile, O_RDONLY);
@@ -233,17 +233,16 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 
     /* here not set file size because find cache not need file size */
     ckey.device = stat_ssb.st_dev;
-    ckey.inode = stat_ssb.st_ino;
-    ckey.mtime = stat_ssb.st_mtime;
+    ckey.inode  = stat_ssb.st_ino;
+    ckey.mtime  = stat_ssb.st_mtime;
 
     citem = beast_cache_find(&ckey); /* find cache */
 
-    if (citem) { /* found cache */
-        close(stream); /* close file */
-
-        *buffer = beast_cache_cdata(citem);
-        *rsize = beast_cache_fsize(citem) + 3;
-
+    if (citem) {  /* found cache, return */
+        *retbuf = beast_cache_cdata(citem);
+        *rsize  = beast_cache_fsize(citem) + 3; /* includes " ?>" */
+        *need_free = 0;
+        close(stream);
         cache_hits++;
         return 0;
     }
@@ -254,7 +253,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
          (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
          (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
     {
-        close(stream); /* close file */
+        close(stream);
         return -1;
     }
 
@@ -266,39 +265,57 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
         file_size = swab32(file_size);
     }
 
-    block_size = file_size / 8 + 1; /* block count */
-    mem_size = block_size * 8 + 3;
+    ckey.fsize = file_size;           /* set file size */
+    block_size = file_size / 8 + 1;   /* block count */
+    mem_size   = block_size * 8 + 3;  /* how many memory would alloc */
 
-    ckey.fsize = file_size; /* set file size */
+    citem = beast_cache_create(&ckey, mem_size); /* alloc from cache */
 
-    citem = beast_cache_create(&ckey, mem_size);
-    if (!citem) {
-        close(stream); /* close file */
-        php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                               "Unable alloc memory for cache");
-        return -1;
+    if (NULL == citem) { /* if alloc cache failed, then we alloc from heap */
+
+        buffer = (char *)malloc(mem_size);
+        if (NULL == buffer) {
+            close(stream);
+            php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
+            return -1;
+        }
+
+        beast_write_log(beast_log_notice,
+                         "Not enough cache, you can set the cache size bigger");
+
+        *need_free = 1; /* must be free when compile the string */
+
+    } else {
+        buffer = beast_cache_cdata(citem);
+        *need_free = 0;
     }
 
-    text = beast_cache_cdata(citem);
+    /* closing php script environment " ?>" */
 
-    /* For closing php script environment " ?>" */
-    text[0] = ' ';
-    text[1] = '?';
-    text[2] = '>';
+    buffer[0] = ' ';
+    buffer[1] = '?';
+    buffer[2] = '>';
 
-    script = &text[3];
+    /* starting decrypt file */
+
+    script = &buffer[3];
 
     for (i = 0; i < block_size; i++) {
         read(stream, input, 8);
         DES_decipher(input, &(script[i * 8]), key);
     }
 
-    close(stream); /* close file */
+    close(stream); /* finish decrypt and close file */
 
-    citem = beast_cache_push(citem); /* push into cache item to manager */
+    if (NULL != citem) {
+        citem   = beast_cache_push(citem); /* push into cache item to manager */
+        *retbuf = beast_cache_cdata(citem);
+        *rsize  = beast_cache_fsize(citem) + 3;
 
-    *buffer = beast_cache_cdata(citem);
-    *rsize = beast_cache_fsize(citem) + 3;
+    } else {
+        *retbuf = buffer;
+        *rsize  = file_size + 3;
+    }
 
     cache_miss++;
 
@@ -306,16 +323,20 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 }
 
 
+/*
+ * used cache
+ */
 zend_op_array * 
 cgi_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 {
-    char *script, *file_path;
-    int fsize;
+    char *buffer, *file_path;
+    int file_size;
+    int need_free = 0;
     zval pv;
     zend_op_array *new_op_array;
 
-    if (decrypt_file_return_buffer(h->filename, __authkey, &script, 
-            &fsize TSRMLS_CC) != 0)
+    if (decrypt_file_return_buffer(h->filename, __authkey, &buffer, 
+            &file_size, &need_free TSRMLS_CC) != 0)
     {
         return old_compile_file(h, type TSRMLS_CC);
     }
@@ -330,16 +351,23 @@ cgi_compile_file(zend_file_handle* h, int type TSRMLS_DC)
     if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
     if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
 
-    pv.value.str.len = fsize;
-    pv.value.str.val = script;
+    pv.value.str.len = file_size;
+    pv.value.str.val = buffer;
     pv.type = IS_STRING;
 
     new_op_array = compile_string(&pv, file_path TSRMLS_CC);
+
+    if (need_free) {
+        free(buffer);
+    }
 
     return new_op_array;
 }
 
 
+/*
+ * don't used cache
+ */
 zend_op_array *
 cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 {
@@ -555,7 +583,7 @@ PHP_MINIT_FUNCTION(beast)
             beast_log_init(beast_log_file) == -1)
         {
             php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                               "Unable initialize cache for beast");
+                                           "Unable initialize cache for beast");
             return FAILURE;
         }
     
