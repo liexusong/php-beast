@@ -334,6 +334,7 @@ cgi_compile_file(zend_file_handle* h, int type TSRMLS_DC)
     int need_free = 0;
     zval pv;
     zend_op_array *new_op_array;
+    int dummy = 1;
 
     if (decrypt_file_return_buffer(h->filename, __authkey, &buffer, 
             &file_size, &need_free TSRMLS_CC) != 0)
@@ -357,6 +358,12 @@ cgi_compile_file(zend_file_handle* h, int type TSRMLS_DC)
 
     new_op_array = compile_string(&pv, file_path TSRMLS_CC);
 
+    if (new_op_array) {
+        /* add current file to included_files */
+        zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
+            (void *)&dummy, sizeof(int), NULL);
+    }
+
     if (need_free) {
         free(buffer);
     }
@@ -378,6 +385,7 @@ cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     char *buffer, *script, *file_path;
     zval pv;
     zend_op_array *new_op_array;
+    int dummy = 1;
 
     stream = open(h->filename, O_RDONLY);
     if (stream == -1) { /* can not open the file */
@@ -443,6 +451,12 @@ cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     pv.type = IS_STRING;
 
     new_op_array = compile_string(&pv, file_path TSRMLS_CC);
+
+    if (new_op_array) {
+        /* add current file to included_files */
+        zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
+            (void *)&dummy, sizeof(int), NULL);
+    }
 
     free(buffer);
 
