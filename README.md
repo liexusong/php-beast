@@ -18,7 +18,10 @@
 接着使用beast_encode_file()函数进行加密,
 加密后的文件beast模块能自动识别.
 
-<pre>使用案例: <a href="http://www.beastcoder.com">http://www.beastcoder.com</a></pre>
+<pre>
+使用案例: <a href="http://www.beastcoder.com">http://www.beastcoder.com</a><br />
+通过网址: <a href="http://www.beastcoder.com/info.php">http://www.beastcoder.com/info.php</a> 可以看到本扩展的信息.
+</pre>
 
 
 编译安装如下:
