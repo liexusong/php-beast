@@ -18,6 +18,8 @@
 接着使用beast_encode_file()函数进行加密,
 加密后的文件beast模块能自动识别.
 
+<pre>使用案例: http://www.beastcoder.com</pre>
+
 
 编译安装如下:
 -------------
