@@ -208,10 +208,9 @@ int encrypt_file(const char *inputfile, const char *outputfile,
 *                                                                            *
 *****************************************************************************/
 
-int decrypt_file_return_buffer(const char *inputfile, const char *key,
-        char **retbuf, int *rsize, int *need_free TSRMLS_DC)
+int decrypt_file_return_buffer(int stream, const char *key,
+    char **retbuf, int *rsize, int *need_free TSRMLS_DC)
 {
-    int stream;
     struct stat stat_ssb;
     cache_key_t ckey;
     cache_item_t *citem;
@@ -220,14 +219,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
     char header[8];
     char *buffer, *script;
 
-    /* open file */
-    stream = open(inputfile, O_RDONLY);
-    if (stream == -1) {
-        return -1;
-    }
-
     if (fstat(stream, &stat_ssb) == -1) {
-        close(stream);
         return -1;
     }
 
@@ -242,7 +234,6 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
         *retbuf = beast_cache_cdata(citem);
         *rsize  = beast_cache_fsize(citem) + 3; /* includes " ?>" */
         *need_free = 0;
-        close(stream);
         cache_hits++;
         return 0;
     }
@@ -253,7 +244,6 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
          (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
          (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
     {
-        close(stream);
         return -1;
     }
 
@@ -273,9 +263,7 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
 
     if (NULL == citem) { /* if alloc cache failed, then we alloc from heap */
 
-        buffer = (char *)malloc(mem_size);
-        if (NULL == buffer) {
-            close(stream);
+        if (NULL == (buffer = malloc(mem_size))) {
             php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
             return -1;
         }
@@ -305,8 +293,6 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
         DES_decipher(input, &(script[i * 8]), key);
     }
 
-    close(stream); /* finish decrypt and close file */
-
     if (NULL != citem) {
         citem   = beast_cache_push(citem); /* push into cache item to manager */
         *retbuf = beast_cache_cdata(citem);
@@ -327,30 +313,44 @@ int decrypt_file_return_buffer(const char *inputfile, const char *key,
  * used cache
  */
 zend_op_array * 
-cgi_compile_file(zend_file_handle* h, int type TSRMLS_DC)
+cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 {
-    char *buffer, *file_path;
+    char *buffer, *file_path, *opened_path;
+    int fd = -1;
+    FILE *fp = NULL;
     int file_size;
     int need_free = 0;
     zval pv;
     zend_op_array *new_op_array;
     int dummy = 1;
 
-    if (decrypt_file_return_buffer(h->filename, __authkey, &buffer, 
-            &file_size, &need_free TSRMLS_CC) != 0)
+    /* Open the file */
+    fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+    if (fp != NULL) {
+        fd = fileno(fp);
+    }
+
+    /* Decrypt */
+    if (fp == NULL || decrypt_file_return_buffer(fd, __authkey, &buffer,
+        &file_size, &need_free TSRMLS_CC) != 0)
     {
+        if (fp != NULL) {
+            fclose(fp);
+        }
         return old_compile_file(h, type TSRMLS_CC);
     }
+
+    /*
+     * close file descriptor when beast decrypt success
+     */
+    if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
+    if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
 
     if (h->opened_path) {
         file_path = h->opened_path;
     } else {
         file_path = h->filename;
     }
-
-    /* close file descriptor when beast decrypt success */
-    if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
-    if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
 
     pv.value.str.len = file_size;
     pv.value.str.val = buffer;
@@ -368,6 +368,8 @@ cgi_compile_file(zend_file_handle* h, int type TSRMLS_DC)
         free(buffer);
     }
 
+    fclose(fp);
+
     return new_op_array;
 }
 
@@ -379,24 +381,27 @@ zend_op_array *
 cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 {
     int stream;
+    FILE *fp = NULL;
     int file_size, block_size, mem_size, i;
     char input[8];
     char header[8];
-    char *buffer, *script, *file_path;
+    char *buffer, *script, *file_path, *opened_path;
     zval pv;
     zend_op_array *new_op_array;
     int dummy = 1;
 
-    stream = open(h->filename, O_RDONLY);
-    if (stream == -1) { /* can not open the file */
+    fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+    if (fp != NULL) {
+        stream = fileno(fp);
+    } else {
         return old_compile_file(h, type TSRMLS_CC);
     }
 
     if (read(stream, header, 8) != 8 ||
          (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
          (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
-    { /* not a beast encrypt file */
-        close(stream);
+    {
+        fclose(fp);
         return old_compile_file(h, type TSRMLS_CC);
     }
 
@@ -411,10 +416,8 @@ cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     block_size = file_size / 8 + 1; /* block count */
     mem_size = block_size * 8 + 3; /* how many memorys would alloc */
 
-    buffer = malloc(mem_size);
-
-    if (NULL == buffer) {
-        close(stream);
+    if (NULL == (buffer = malloc(mem_size))) {
+        fclose(fp);
         php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
         return old_compile_file(h, type TSRMLS_CC);
     }
@@ -432,7 +435,7 @@ cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         DES_decipher(input, &(script[i * 8]), __authkey);
     }
 
-    close(stream);
+    fclose(fp);
 
     /* finish decrypt file, do compile */
 
@@ -640,7 +643,6 @@ PHP_MSHUTDOWN_FUNCTION(beast)
 }
 /* }}} */
 
-/* Remove if there's nothing to do at request start */
 /* {{{ PHP_RINIT_FUNCTION
  */
 PHP_RINIT_FUNCTION(beast)
@@ -649,7 +651,6 @@ PHP_RINIT_FUNCTION(beast)
 }
 /* }}} */
 
-/* Remove if there's nothing to do at request end */
 /* {{{ PHP_RSHUTDOWN_FUNCTION
  */
 PHP_RSHUTDOWN_FUNCTION(beast)
@@ -732,7 +733,6 @@ PHP_FUNCTION(beast_cache_info)
 }
 
 /* }}} */
-
 
 /*
  * Local variables:
