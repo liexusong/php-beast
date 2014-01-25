@@ -89,7 +89,7 @@ zend_module_entry beast_module_entry = {
     PHP_RSHUTDOWN(beast),
     PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-    "1.2", /* Replace with version number for your extension */
+    "1.3", /* Replace with version number for your extension */
 #endif
     STANDARD_MODULE_PROPERTIES
 };
@@ -664,7 +664,7 @@ PHP_RSHUTDOWN_FUNCTION(beast)
 PHP_MINFO_FUNCTION(beast)
 {
     php_info_print_table_start();
-    php_info_print_table_header(2, "beast support", "enabled");
+    php_info_print_table_header(2, "beast V1.3 support", "enabled");
     php_info_print_table_end();
 
     DISPLAY_INI_ENTRIES();
@@ -733,6 +733,7 @@ PHP_FUNCTION(beast_cache_info)
 }
 
 /* }}} */
+
 
 /*
  * Local variables:
