@@ -9,8 +9,7 @@
  此模块可以用于商业, 使用DES加密算法加密, 版权归原作者.
 </code></pre>
 
-使用方法:
----------------------
+<h3>使用方法:</h3>
 <pre>
 修改key.c文件的__authkey加密key, 编译安装, 接着使用beast_encode_file()函数进行加密, 加密后的文件beast模块能自动识别.<br />
 使用案例: <a href="http://www.beastcoder.com">http://www.beastcoder.com</a><br />
