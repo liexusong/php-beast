@@ -51,7 +51,16 @@ $ sudo make && make install
 
 注意
 ----
-如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
+如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。或者安装下面的解决方法：
+<pre>
+<code>
+在Makefile文件中的CFLAGS中添加march这个参数：
+1) Core 2 Duo，GCC 4.2, 添加 -march=nocona -mtune=generic
+2) Core 2 Duo，GCC 4.1，Core Solo/Duo添加 -march=prescott
+3) Core 2 Duo/Solo 则添加 -march=nocona
+4) i686 则添加 -O2 -march=i686 
+</code>
+</pre>
 
 TODO:
 -----
