@@ -48,6 +48,11 @@ $ sudo make && make install
  Nginx + Fastcgi + (PHP-5.3.x/PHP-5.2.x)
 </code></pre>
 
+
+注意
+----
+如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
+
 TODO:
 -----
 * 增加opcode缓存
