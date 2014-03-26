@@ -241,8 +241,8 @@ int decrypt_file_return_buffer(int stream, const char *key,
     /* not found cache */
 
     if (read(stream, header, 8) != 8 ||
-         (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
-         (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
+          (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
+          (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
     {
         return -1;
     }
@@ -267,9 +267,6 @@ int decrypt_file_return_buffer(int stream, const char *key,
             php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
             return -1;
         }
-
-        beast_write_log(beast_log_notice,
-                         "Not enough cache, you can set the cache size bigger");
 
         *need_free = 1; /* must be free when compile the string */
 
@@ -557,7 +554,7 @@ ZEND_INI_MH(php_beast_enable)
         return FAILURE;
     }
 
-    if (!strcasecmp(new_value, "on")) {
+    if (!strcasecmp(new_value, "on") || !strcmp(new_value, "1")) {
         beast_enable = 1;
     } else {
         beast_enable = 0;
