@@ -54,23 +54,24 @@ int beast_cache_init(int size)
     }
 
     /* init cache lock */
-    cache_lock = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-                                               MAP_SHARED | MAP_ANON, -1, 0);
+    cache_lock = (int *)mmap(NULL, sizeof(int), PROT_READ|PROT_WRITE,
+                                                MAP_SHARED|MAP_ANON, -1, 0);
     if (!cache_lock) {
         beast_write_log(beast_log_error,
-              "Unable alloc share memory for cache lock");
+                                    "Unable alloc share memory for cache lock");
         beast_mm_destroy();
         return -1;
     }
+
     *cache_lock = 0;
 
     /* init cache buckets's memory */
     bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
     beast_cache_buckets = (cache_item_t **)mmap(NULL, bucket_size,
-                          PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+                              PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANON, -1, 0);
     if (!beast_cache_buckets) {
         beast_write_log(beast_log_error,
-              "Unable alloc share memory for cache buckets");
+                                 "Unable alloc share memory for cache buckets");
         munmap(cache_lock, sizeof(int));
         beast_mm_destroy();
         return -1;
@@ -141,8 +142,10 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
     }
 
     item = beast_mm_malloc(msize);
-    if (!item)
-    {
+
+    if (!item) {
+
+#if 0
         int index;
 
         /* clean all caches */
@@ -161,6 +164,11 @@ cache_item_t *beast_cache_create(cache_key_t *key, int size)
         if (!item) {
             return NULL;
         }
+#endif
+
+        beast_write_log(beast_log_notice, "Not enough caches, "
+            "please setting <beast.cache_size> bigger in `php.ini' file");
+        return NULL;
     }
 
     item->key.device = key->device;
