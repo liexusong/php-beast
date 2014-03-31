@@ -355,11 +355,13 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 
     new_op_array = compile_string(&pv, file_path TSRMLS_CC);
 
+#if 0
     if (new_op_array) {
         /* add current file to included_files */
         zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
             (void *)&dummy, sizeof(int), NULL);
     }
+#endif
 
     if (need_free) {
         free(buffer);
@@ -452,11 +454,13 @@ cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 
     new_op_array = compile_string(&pv, file_path TSRMLS_CC);
 
+#if 0
     if (new_op_array) {
         /* add current file to included_files */
         zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
             (void *)&dummy, sizeof(int), NULL);
     }
+#endif
 
     free(buffer);
 
