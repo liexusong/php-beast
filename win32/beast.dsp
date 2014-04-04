@@ -110,6 +110,14 @@ SOURCE=.\encrypt.c
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
+SOURCE=.\bit.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\encrypt.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\php_beast.h
 # End Source File
 # End Group
