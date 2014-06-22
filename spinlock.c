@@ -17,12 +17,13 @@
 */
 
 #include <stdlib.h>
+#include "spinlock.h"
 
 
 extern int beast_ncpu;
 
 
-void beast_spinlock(int *lock, int pid)
+void beast_spinlock(beast_atomic_t *lock, int pid)
 {
     int i, n;
 
@@ -53,7 +54,7 @@ void beast_spinlock(int *lock, int pid)
 }
 
 
-void beast_spinunlock(int *lock, int pid)
+void beast_spinunlock(beast_atomic_t *lock, int pid)
 {
     __sync_bool_compare_and_swap(lock, pid, 0);
 }

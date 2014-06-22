@@ -44,7 +44,7 @@ typedef struct beast_block_s {
 static int beast_mm_initialized = 0;
 static void *beast_mm_block = NULL;
 static int beast_mm_block_size = 0;
-static int *mm_lock;
+static beast_atomic_t *mm_lock;
 
 
 /*

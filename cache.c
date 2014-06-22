@@ -32,7 +32,7 @@
 
 static int beast_cache_initialization = 0;
 static cache_item_t **beast_cache_buckets = NULL;
-static int *cache_lock;
+static beast_atomic_t *cache_lock;
 
 
 static inline int beast_cache_hash(cache_key_t *key)
