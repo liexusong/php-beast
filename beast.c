@@ -27,7 +27,15 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+
 #include "zend.h"
+#include "zend_operators.h"
+#include "zend_globals.h"
+#include "php_globals.h"
+#include "zend_language_scanner.h"
+#include <zend_language_parser.h>
+
 #include "zend_API.h"
 #include "zend_compile.h"
 
@@ -89,7 +97,7 @@ zend_module_entry beast_module_entry = {
     PHP_RSHUTDOWN(beast),
     PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-    "1.3", /* Replace with version number for your extension */
+    "1.4", /* Replace with version number for your extension */
 #endif
     STANDARD_MODULE_PROPERTIES
 };
@@ -123,6 +131,36 @@ static int big_endian()
 }
 
 
+int getcodes_filter_comments(char *filename, zval *retval)
+{
+    zend_lex_state original_lex_state;
+    zend_file_handle file_handle = {0};
+
+    file_handle.type = ZEND_HANDLE_FILENAME;
+    file_handle.filename = filename;
+    file_handle.free_filename = 0;
+    file_handle.opened_path = NULL;
+
+    zend_save_lexical_state(&original_lex_state TSRMLS_CC);
+    if (open_file_for_scanning(&file_handle TSRMLS_CC) == FAILURE) {
+        zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+        return -1;
+    }
+
+    php_start_ob_buffer(NULL, 0, 1 TSRMLS_CC);
+
+    zend_strip(TSRMLS_C);
+
+    zend_destroy_file_handle(&file_handle TSRMLS_CC);
+    zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+
+    php_ob_get_buffer(retval TSRMLS_CC);
+    php_end_ob_buffer(0, 0 TSRMLS_CC);
+
+    return 0;
+}
+
+
 /*****************************************************************************
 *                                                                            *
 *  Encrypt a plain text file and output a cipher file                        *
@@ -132,44 +170,40 @@ static int big_endian()
 int encrypt_file(const char *inputfile, const char *outputfile, 
     const char *key TSRMLS_DC)
 {
-    php_stream *input_stream, *output_stream;
-    php_stream_statbuf stat_ssb;
-    int file_size, block_count, i;
+    php_stream *output_stream;
+    int file_size, block_count, i, fill;
     char input[8], output[8];
     char header[8];
+    zval codes;
+    char *codes_str;
 
-    /* Open input file */
-    input_stream = php_stream_open_wrapper(inputfile, "r",
-        ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
-    if (!input_stream) {
+    /* Get php codes from script file */
+    if (getcodes_filter_comments((char *)inputfile, &codes) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                         "Unable to open file `%s'", inputfile);
+                              "Unable get codes from php file `%s'", inputfile);
         return -1;
     }
 
-    /* Get input file size */
-    if (php_stream_stat(input_stream, &stat_ssb)) {
-        php_stream_pclose(input_stream);
-        return -1;
-    }
-
-    file_size = stat_ssb.sb.st_size;
-    if (file_size <= 0) {
-        php_stream_pclose(input_stream);
-        return -1;
-    }
+    file_size = codes.value.str.len;
+    codes_str = codes.value.str.val;
 
     /* Open output file */
-    output_stream = php_stream_open_wrapper(outputfile, "w+",
+    output_stream = php_stream_open_wrapper((char *)outputfile, "w+",
         ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
     if (!output_stream) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                                         "Unable to open file `%s'", outputfile);
-        php_stream_pclose(input_stream);
         return -1;
     }
 
-    block_count = file_size / 8 + 1;
+    /* How many DES blocks */
+    if ((file_size % 8) == 0) {
+        fill = 0;
+        block_count = file_size / 8;
+    } else {
+        fill = file_size % 8;
+        block_count = file_size / 8 + 1;
+    }
 
     header[0] = CHR1;
     header[1] = CHR2;
@@ -177,26 +211,30 @@ int encrypt_file(const char *inputfile, const char *outputfile,
     header[3] = CHR4;
 
     /* if computer is little endian, change file size to big endian */
-
     if (little_endian()) {
         file_size = swab32(file_size);
     }
 
+    /* Save file size into encrypt file */
     *((int *)&header[4]) = file_size;
 
     php_stream_write(output_stream, header, 8);
 
     for (i = 0; i < block_count; i++) {
-
         memset(input, 0, 8);
 
-        (void)php_stream_read(input_stream, input, 8);
+        if (i + 1 == block_count && fill > 0) { /* The last block not enough 8 bytes */
+            memcpy(input, &codes_str[i * 8], fill);
+        } else {
+            memcpy(input, &codes_str[i * 8], 8);
+        }
+
         DES_encipher(input, output, key);
         php_stream_write(output_stream, output, 8);
     }
 
-    php_stream_close(input_stream);
     php_stream_close(output_stream);
+    zval_dtor(&codes);
 
     return 0;
 }
@@ -214,7 +252,7 @@ int decrypt_file_return_buffer(int stream, const char *key,
     struct stat stat_ssb;
     cache_key_t ckey;
     cache_item_t *citem;
-    int file_size, block_size, mem_size, i;
+    int file_size, block_size, mem_size, i, n;
     char input[8];
     char header[8];
     char *buffer, *script;
@@ -230,7 +268,7 @@ int decrypt_file_return_buffer(int stream, const char *key,
 
     citem = beast_cache_find(&ckey); /* find cache */
 
-    if (citem) {  /* found cache, return */
+    if (citem != NULL) {  /* found cache, return */
         *retbuf = beast_cache_cdata(citem);
         *rsize  = beast_cache_fsize(citem) + 3; /* includes " ?>" */
         *need_free = 0;
@@ -238,7 +276,7 @@ int decrypt_file_return_buffer(int stream, const char *key,
         return 0;
     }
 
-    /* not found cache */
+    /* Not found cache */
 
     if (read(stream, header, 8) != 8 ||
           (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
@@ -247,27 +285,29 @@ int decrypt_file_return_buffer(int stream, const char *key,
         return -1;
     }
 
-    file_size = *((int *)&header[4]);
+    file_size = *((int *)&header[4]); /* Get file size */
 
-    /* if computer is little endian, change file size to little endian */
-
+    /* If computer is little endian, change file size to little endian */
     if (little_endian()) {
         file_size = swab32(file_size);
     }
 
-    ckey.fsize = file_size;           /* set file size */
-    block_size = file_size / 8 + 1;   /* block count */
-    mem_size   = block_size * 8 + 3;  /* how many memory would alloc */
+    /* Compute DES blocks */
+    if (file_size % 8 == 0) {
+        block_size = file_size / 8;   
+    } else {
+        block_size = file_size / 8 + 1;
+    }
 
-    citem = beast_cache_create(&ckey, mem_size); /* alloc from cache */
+    mem_size = block_size * 8 + 3;  /* How many memory would alloc */
+    ckey.fsize = file_size;
 
-    if (NULL == citem) { /* if alloc cache failed, then we alloc from heap */
-
+    citem = beast_cache_create(&ckey, mem_size);
+    if (NULL == citem) {
         if (NULL == (buffer = malloc(mem_size))) {
             php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
             return -1;
         }
-
         *need_free = 1; /* must be free when compile the string */
 
     } else {
@@ -275,18 +315,17 @@ int decrypt_file_return_buffer(int stream, const char *key,
         *need_free = 0;
     }
 
-    /* closing php script environment " ?>" */
-
+    /* Closing php script environment " ?>" */
     buffer[0] = ' ';
     buffer[1] = '?';
     buffer[2] = '>';
 
-    /* starting decrypt file */
+    /* Starting decrypt file */
 
     script = &buffer[3];
 
     for (i = 0; i < block_size; i++) {
-        read(stream, input, 8);
+        n = read(stream, input, 8);
         DES_decipher(input, &(script[i * 8]), key);
     }
 
@@ -387,7 +426,7 @@ cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     char *buffer, *script, *file_path, *opened_path;
     zval pv;
     zend_op_array *new_op_array;
-    int dummy = 1;
+    int dummy = 1, n;
 
     fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
     if (fp != NULL) {
@@ -430,7 +469,7 @@ cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     script = &buffer[3];
 
     for (i = 0; i < block_size; i++) {
-        read(stream, input, 8);
+        n = read(stream, input, 8);
         DES_decipher(input, &(script[i * 8]), __authkey);
     }
 
@@ -573,7 +612,7 @@ PHP_INI_BEGIN()
           php_beast_cache_size)
     PHP_INI_ENTRY("beast.log_file", "/tmp/beast.log", PHP_INI_ALL,
           php_beast_log_file)
-    PHP_INI_ENTRY("beast.enable", "On", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.enable", "1", PHP_INI_ALL,
           php_beast_enable)
 PHP_INI_END()
 
