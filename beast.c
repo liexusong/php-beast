@@ -131,10 +131,36 @@ static int big_endian()
 }
 
 
-int getcodes_filter_comments(char *filename, zval *retval)
+int filter_code_comments(char *filename, zval *retval)
 {
     zend_lex_state original_lex_state;
     zend_file_handle file_handle = {0};
+
+#if PHP_API_VERSION > 20090626
+
+    php_output_start_default(TSRMLS_C);
+
+    file_handle.type = ZEND_HANDLE_FILENAME;
+    file_handle.filename = filename;
+    file_handle.free_filename = 0;
+    file_handle.opened_path = NULL;
+
+    zend_save_lexical_state(&original_lex_state TSRMLS_CC);
+    if (open_file_for_scanning(&file_handle TSRMLS_CC) == FAILURE) {
+        zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+        php_output_end(TSRMLS_C);
+        return -1;
+    }
+
+    zend_strip(TSRMLS_C);
+
+    zend_destroy_file_handle(&file_handle TSRMLS_CC);
+    zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+
+    php_output_get_contents(return_value TSRMLS_CC);
+    php_output_discard(TSRMLS_C);
+
+#else
 
     file_handle.type = ZEND_HANDLE_FILENAME;
     file_handle.filename = filename;
@@ -157,6 +183,8 @@ int getcodes_filter_comments(char *filename, zval *retval)
     php_ob_get_buffer(retval TSRMLS_CC);
     php_end_ob_buffer(0, 0 TSRMLS_CC);
 
+#endif
+
     return 0;
 }
 
@@ -178,7 +206,7 @@ int encrypt_file(const char *inputfile, const char *outputfile,
     char *codes_str;
 
     /* Get php codes from script file */
-    if (getcodes_filter_comments((char *)inputfile, &codes) == -1) {
+    if (filter_code_comments((char *)inputfile, &codes) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                               "Unable get codes from php file `%s'", inputfile);
         return -1;
@@ -783,3 +811,4 @@ PHP_FUNCTION(beast_cache_info)
  * vim600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
+
