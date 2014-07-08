@@ -157,7 +157,7 @@ int filter_code_comments(char *filename, zval *retval)
     zend_destroy_file_handle(&file_handle TSRMLS_CC);
     zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
 
-    php_output_get_contents(return_value TSRMLS_CC);
+    php_output_get_contents(retval TSRMLS_CC);
     php_output_discard(TSRMLS_C);
 
 #else
