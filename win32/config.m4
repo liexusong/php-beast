@@ -59,5 +59,5 @@ if test "$PHP_BEAST" != "no"; then
   dnl
   dnl PHP_SUBST(BEAST_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(beast, beast.c, $ext_shared)
+  PHP_NEW_EXTENSION(beast, beast.c encrypt.c bit.c, $ext_shared)
 fi
