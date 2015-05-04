@@ -295,6 +295,7 @@ PHP_FUNCTION(beast_run_file)
     long index;
     int fsize, bsize, msize, i;
     char *buff, *script, input[8];
+    zval retval;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sl", 
                                  &input_file, &input_len, &offset) == FAILURE) {
@@ -440,7 +441,7 @@ enough_memory:
 
 evalscript:
 
-    if (zend_eval_string(buff, NULL, input_file TSRMLS_CC) == FAILURE) {
+    if (zend_eval_string(buff, &retval, input_file TSRMLS_CC) == FAILURE) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                                                 "Unable execute script string");
     }
@@ -448,6 +449,8 @@ evalscript:
     if (!enable_cache) {
         free(buff);
     }
+
+    *return_value = retval;
 
     return;
 }

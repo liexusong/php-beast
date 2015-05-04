@@ -82,14 +82,14 @@ ZEND_END_MODULE_GLOBALS(beast)
 #endif
 
 #ifdef _WIN32
-# define NLTAG "\r\n"
+# define CRLF "\r\n"
 #else
-# define NLTAG "\n"
+# define CRLF "\n"
 #endif
 
-#define OUTPUT_FILE_HEADER  "<?php" NLTAG                               \
-    "# Copyright(c) PHP-Beast module #" NLTAG                           \
-    "beast_run_file(__FILE__, __COMPILER_HALT_OFFSET__);" NLTAG         \
+#define OUTPUT_FILE_HEADER  "<?php" CRLF                                      \
+    "/* Copyright (c) php-beast extension */" CRLF                            \
+    "return beast_run_file(__FILE__, __COMPILER_HALT_OFFSET__);" CRLF         \
     "__halt_compiler();"
 
 #endif	/* PHP_BEAST_H */
