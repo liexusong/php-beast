@@ -87,9 +87,9 @@ ZEND_END_MODULE_GLOBALS(beast)
 # define CRLF "\n"
 #endif
 
-#define OUTPUT_FILE_HEADER  "<?php" CRLF                                      \
-    "/* Copyright (c) php-beast extension */" CRLF                            \
-    "return beast_run_file(__FILE__, __COMPILER_HALT_OFFSET__);" CRLF         \
+#define OUTPUT_FILE_HEADER  "<?php" CRLF                               \
+    "/* Copyright (c) php-beast extension */" CRLF                     \
+    "beast_run_file(__FILE__, __COMPILER_HALT_OFFSET__);" CRLF         \
     "__halt_compiler();"
 
 #endif	/* PHP_BEAST_H */
