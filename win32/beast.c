@@ -412,7 +412,9 @@ enough_memory:
         }
     }
 
-    /* for closing php script environment */
+    /*
+     * Closing PHP runtime environment and return to text environment
+     */
     buff[0] = ' ';
     buff[1] = ';';
     buff[2] = ' ';
@@ -442,8 +444,7 @@ enough_memory:
 evalscript:
 
     if (zend_eval_string(buff, &retval, input_file TSRMLS_CC) == FAILURE) {
-        php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                                "Unable execute script string");
+        php_error_docref(NULL TSRMLS_CC, E_ERROR, "Unable execute script string");
     }
 
     if (!enable_cache) {
