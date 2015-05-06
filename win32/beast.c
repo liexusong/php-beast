@@ -190,7 +190,7 @@ PHP_INI_BEGIN()
           php_beast_enable_cache)
     PHP_INI_ENTRY("beast.cache_size", "5242880", PHP_INI_ALL,
           php_beast_cache_size)
-    PHP_INI_ENTRY("beast.encrypt_file", NULL, PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.encrypt_file", "", PHP_INI_ALL,
           php_beast_encrypt_file)
 PHP_INI_END()
 
