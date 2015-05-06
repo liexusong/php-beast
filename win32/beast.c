@@ -27,6 +27,7 @@
 #include "ext/standard/info.h"
 #include "php_beast.h"
 #include "encrypt.h"
+#include "md5.h"
 
 
 #define  DEFAULT_MAX_CACHE  5242880  /* 5MB */
@@ -35,6 +36,7 @@
 
 static int enable_cache = 1;
 static int cache_max_size = DEFAULT_MAX_CACHE;
+static char *encrypt_file = NULL;
 static int le_beast;
 
 static char __authkey[8] = {
@@ -165,11 +167,31 @@ ZEND_INI_MH(php_beast_enable_cache)
 }
 
 
+ZEND_INI_MH(php_beast_encrypt_file)
+{
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    encrypt_file = malloc(new_value_length + 1);
+    if (!encrypt_file) {
+        return FAILURE;
+    }
+
+    memcpy(encrypt_file, new_value, new_value_length);
+    encrypt_file[new_value_length] = '\0';
+
+    return SUCCESS;
+}
+
+
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.enable_cache", "1", PHP_INI_ALL,
           php_beast_enable_cache)
     PHP_INI_ENTRY("beast.cache_size", "5242880", PHP_INI_ALL,
           php_beast_cache_size)
+    PHP_INI_ENTRY("beast.encrypt_file", NULL, PHP_INI_ALL,
+          php_beast_encrypt_file)
 PHP_INI_END()
 
 
@@ -217,6 +239,18 @@ PHP_MINIT_FUNCTION(beast)
     php_beast_globals_dtor(&beast_globals TSRMLS_CC);
 #endif
 
+    /* encrypt file was set */
+    if (encrypt_file) {
+        char buffer[32];
+        int i;
+
+        if (md5_file(encrypt_file, buffer) == 0) {
+            for (i = 0; i < 8; i++) {
+                __authkey[i] = buffer[i * 4];
+            }
+        }
+    }
+
     return SUCCESS;
 }
 /* }}} */
@@ -231,6 +265,10 @@ PHP_MSHUTDOWN_FUNCTION(beast)
 #ifndef ZTS
     php_beast_globals_dtor(&beast_globals TSRMLS_CC);
 #endif
+
+    if (encrypt_file) {
+        free(encrypt_file);
+    }
 
     return SUCCESS;
 }
