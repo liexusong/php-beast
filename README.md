@@ -69,6 +69,6 @@ win32文件夹中是win版本的加密模块, 但是因为没有缓存, 所以�
 
 我的著作: http://book.jd.com/11123177.html<br/>
 <b>提供安装配置服务和定制版本, 请联系QQ: 280259971</b><br/>
-捐赠本项目: <img src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" />
+捐赠本项目: <img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" />
 ------------------------------
 
