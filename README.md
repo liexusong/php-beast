@@ -69,12 +69,6 @@ win32文件夹中是win版本的加密模块, 但是因为没有缓存, 所以�
 
 我的著作: http://book.jd.com/11123177.html<br/>
 <b>提供安装配置服务和定制版本, 请联系QQ: 280259971</b><br/>
-捐赠本项目: 
-<form accept-charset="GBK" action="https://shenghuo.alipay.com/send/payment/fill.htm" method="POST" target="_blank">
-<input name="optEmail" type="hidden" value="liexusong@126.com" />
-<input name="payAmount" type="hidden" value="10" />
-<input name="title" type="hidden" value="捐赠 PHP-Beast" />
-<input name="memo" type="hidden" value="PHP-Beast 捐赠" />
-<input name="pay" src="https://lh5.googleusercontent.com/j4mONXiOjLJDH6GawcBEpIGNvH3ZhH8Vhntz_CjjehBl=w159-h37-no" type="image" value="转账" /><br /></form>
+捐赠本项目: <img src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" />
 ------------------------------
 
