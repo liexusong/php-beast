@@ -5,18 +5,17 @@
  |  ___/|  __  |  ___/  |  _ ||  __|   / /\ \  \___ \   | |   
  | |    | |  | | |      | |_)\| |____ / ____ \ ____) |  | |   
  |_|    |_|  |_|_|      |____/|______/_/    \_\_____/   |_|   
+ 
+ 此模块可以用于商业, 使用DES加密算法加密, 版权归原作者.
+ 官网：<a href="http://php-beast.com">http://php-beast.com</a>
 </code></pre>
 
-此模块可以用于商业,
-使用DES加密算法加密,
-版权归原作者.
-
-
-使用方法:
-=========
-修改key.c文件的__authkey加密key, 编译安装,
-接着使用beast_encode_file()函数进行加密,
-加密后的文件beast模块能自动识别.
+<h3>使用方法:</h3>
+<pre>
+修改key.c文件的__authkey加密key, 编译安装, 接着使用beast_encode_file()函数进行加密, 加密后的文件beast模块能自动识别.<br />
+使用案例: <a href="http://www.beastcoder.com">http://www.beastcoder.com</a><br />
+通过网址: <a href="http://www.beastcoder.com/info.php">http://www.beastcoder.com/info.php</a> 可以看到本扩展的信息.
+</pre>
 
 
 编译安装如下:
@@ -42,13 +41,19 @@ $ sudo make && make install
 <pre><code>
  beast.cache_size = size
  beast.log_file = "path_to_log"
- beast.lock_path = "path_to_locker"
+ beast.enable = On
 </code></pre>
 
 通过测试环境:
 <pre><code>
  Nginx + Fastcgi + (PHP-5.3.x/PHP-5.2.x)
 </code></pre>
+
+
+注意
+----
+如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
+
 
 TODO:
 -----
@@ -61,10 +66,10 @@ win32文件夹中是win版本的加密模块, 但是因为没有缓存, 所以�
 
 
 ------------------------------
-作者: 列旭松(280259971@qq.com)
+作者: 列旭松(280259971@qq.com) 专业定制PHP扩展、Nginx模块。
 
 我的著作: http://book.jd.com/11123177.html<br/>
-定制版本请联系: 280259971<br/>
-捐赠本项目: <a href='http://me.alipay.com/liexusong'><img src='https://img.alipay.com/sys/personalprod/style/mc/btn-index.png' /></a>
+<b>提供安装配置服务和定制版本, 请联系QQ: 280259971</b><br/>
+捐赠本项目: <img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" />
 ------------------------------
 

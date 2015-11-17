@@ -13,9 +13,9 @@ dnl [  --with-beast             Include beast support])
 
 dnl Otherwise use enable:
 
-dnl PHP_ARG_ENABLE(beast, whether to enable beast support,
+PHP_ARG_ENABLE(beast, whether to enable beast support,
 dnl Make sure that the comment is aligned:
-dnl [  --enable-beast           Enable beast support])
+[  --enable-beast           Enable beast support])
 
 if test "$PHP_BEAST" != "no"; then
   dnl Write more examples of tests here...
@@ -59,5 +59,5 @@ if test "$PHP_BEAST" != "no"; then
   dnl
   dnl PHP_SUBST(BEAST_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(beast, beast.c, $ext_shared)
+  PHP_NEW_EXTENSION(beast, beast.c encrypt.c bit.c md5.c, $ext_shared)
 fi

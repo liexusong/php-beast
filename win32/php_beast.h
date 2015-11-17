@@ -42,16 +42,28 @@ PHP_MINFO_FUNCTION(beast);
 
 PHP_FUNCTION(beast_run_file);
 PHP_FUNCTION(beast_encode_file);
+PHP_FUNCTION(beast_cache_list);
+PHP_FUNCTION(beast_cache_flush);
 
-/* 
-  	Declare any global variables you may need between the BEGIN
-	and END macros here:     
+
+#define CACHE_BUCKET_SIZE 1000
+
+
+typedef struct cache_item cache_item;
+
+struct cache_item {
+    cache_item *next;
+    int fname_size;
+    int cache_size;
+    char data[0];
+};
+
 
 ZEND_BEGIN_MODULE_GLOBALS(beast)
-	long  global_value;
-	char *global_string;
+    int cache_total_size;
+    cache_item *caches[CACHE_BUCKET_SIZE];
 ZEND_END_MODULE_GLOBALS(beast)
-*/
+
 
 /* In every utility function you add that needs to use variables 
    in php_beast_globals, call TSRMLS_FETCH(); after declaring other 
@@ -70,14 +82,14 @@ ZEND_END_MODULE_GLOBALS(beast)
 #endif
 
 #ifdef _WIN32
-# define NLTAG "\r\n"
+# define CRLF "\r\n"
 #else
-# define NLTAG "\n"
+# define CRLF "\n"
 #endif
 
-#define OUTPUT_FILE_HEADER  "<?php" NLTAG                               \
-    "/* Copyright(c) PHP-Beast module */" NLTAG                         \
-    "beast_run_file(__FILE__, __COMPILER_HALT_OFFSET__);" NLTAG         \
+#define OUTPUT_FILE_HEADER  "<?php" CRLF                               \
+    "/* Copyright (c) php-beast extension */" CRLF                     \
+    "beast_run_file(__FILE__, __COMPILER_HALT_OFFSET__);" CRLF         \
     "__halt_compiler();"
 
 #endif	/* PHP_BEAST_H */

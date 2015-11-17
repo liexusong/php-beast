@@ -27,12 +27,21 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+
 #include "zend.h"
+#include "zend_operators.h"
+#include "zend_globals.h"
+#include "php_globals.h"
+#include "zend_language_scanner.h"
+#include <zend_language_parser.h>
+
 #include "zend_API.h"
 #include "zend_compile.h"
 
 #include "php.h"
 #include "php_ini.h"
+#include "main/SAPI.h"
 #include "ext/standard/info.h"
 #include "php_streams.h"
 #include "php_beast.h"
@@ -49,9 +58,8 @@ extern char __authkey[];
 /*
  * Global vaiables for extension
  */
-
 char *beast_log_file;
-char *beast_lock_path;
+int beast_ncpu;
 
 /* True global resources - no need for thread safety here */
 static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
@@ -61,6 +69,7 @@ static int max_cache_size = DEFAULT_CACHE_SIZE;
 static int cache_hits = 0;
 static int cache_miss = 0;
 static int beast_enable = 1;
+static int beast_cli_module = 0;
 
 /* {{{ beast_functions[]
  *
@@ -88,7 +97,7 @@ zend_module_entry beast_module_entry = {
     PHP_RSHUTDOWN(beast),
     PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-    "1.0", /* Replace with version number for your extension */
+    "1.4", /* Replace with version number for your extension */
 #endif
     STANDARD_MODULE_PROPERTIES
 };
@@ -122,21 +131,61 @@ static int big_endian()
 }
 
 
-static int __beast_fopen(char *filename)
+int filter_code_comments(char *filename, zval *retval)
 {
-    int fd;
+    zend_lex_state original_lex_state;
+    zend_file_handle file_handle = {0};
 
-    fd = open(filename, O_RDONLY);
+#if PHP_API_VERSION > 20090626
 
-    return fd;
-}
+    php_output_start_default(TSRMLS_C);
 
+    file_handle.type = ZEND_HANDLE_FILENAME;
+    file_handle.filename = filename;
+    file_handle.free_filename = 0;
+    file_handle.opened_path = NULL;
 
-static void __beast_fclose(int fd)
-{
-    if (fd >= 0) {
-        close(fd);
+    zend_save_lexical_state(&original_lex_state TSRMLS_CC);
+    if (open_file_for_scanning(&file_handle TSRMLS_CC) == FAILURE) {
+        zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+        php_output_end(TSRMLS_C);
+        return -1;
     }
+
+    zend_strip(TSRMLS_C);
+
+    zend_destroy_file_handle(&file_handle TSRMLS_CC);
+    zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+
+    php_output_get_contents(retval TSRMLS_CC);
+    php_output_discard(TSRMLS_C);
+
+#else
+
+    file_handle.type = ZEND_HANDLE_FILENAME;
+    file_handle.filename = filename;
+    file_handle.free_filename = 0;
+    file_handle.opened_path = NULL;
+
+    zend_save_lexical_state(&original_lex_state TSRMLS_CC);
+    if (open_file_for_scanning(&file_handle TSRMLS_CC) == FAILURE) {
+        zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+        return -1;
+    }
+
+    php_start_ob_buffer(NULL, 0, 1 TSRMLS_CC);
+
+    zend_strip(TSRMLS_C);
+
+    zend_destroy_file_handle(&file_handle TSRMLS_CC);
+    zend_restore_lexical_state(&original_lex_state TSRMLS_CC);
+
+    php_ob_get_buffer(retval TSRMLS_CC);
+    php_end_ob_buffer(0, 0 TSRMLS_CC);
+
+#endif
+
+    return 0;
 }
 
 
@@ -149,44 +198,40 @@ static void __beast_fclose(int fd)
 int encrypt_file(const char *inputfile, const char *outputfile, 
     const char *key TSRMLS_DC)
 {
-    php_stream *input_stream, *output_stream;
-    php_stream_statbuf stat_ssb;
-    int file_size, block_count, i;
+    php_stream *output_stream;
+    int file_size, block_count, i, fill;
     char input[8], output[8];
     char header[8];
+    zval codes;
+    char *codes_str;
 
-    /* Open input file */
-    input_stream = php_stream_open_wrapper(inputfile, "r",
-        ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
-    if (!input_stream) {
+    /* Get php codes from script file */
+    if (filter_code_comments((char *)inputfile, &codes) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                         "Unable to open file `%s'", inputfile);
+                              "Unable get codes from php file `%s'", inputfile);
         return -1;
     }
 
-    /* Get input file size */
-    if (php_stream_stat(input_stream, &stat_ssb)) {
-        php_stream_pclose(input_stream);
-        return -1;
-    }
-
-    file_size = stat_ssb.sb.st_size;
-    if (file_size <= 0) {
-        php_stream_pclose(input_stream);
-        return -1;
-    }
+    file_size = codes.value.str.len;
+    codes_str = codes.value.str.val;
 
     /* Open output file */
-    output_stream = php_stream_open_wrapper(outputfile, "w+",
+    output_stream = php_stream_open_wrapper((char *)outputfile, "w+",
         ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
     if (!output_stream) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                                         "Unable to open file `%s'", outputfile);
-        php_stream_pclose(input_stream);
         return -1;
     }
 
-    block_count = file_size / 8 + 1;
+    /* How many DES blocks */
+    if ((file_size % 8) == 0) {
+        fill = 0;
+        block_count = file_size / 8;
+    } else {
+        fill = file_size % 8;
+        block_count = file_size / 8 + 1;
+    }
 
     header[0] = CHR1;
     header[1] = CHR2;
@@ -194,25 +239,30 @@ int encrypt_file(const char *inputfile, const char *outputfile,
     header[3] = CHR4;
 
     /* if computer is little endian, change file size to big endian */
-
     if (little_endian()) {
         file_size = swab32(file_size);
     }
 
+    /* Save file size into encrypt file */
     *((int *)&header[4]) = file_size;
 
     php_stream_write(output_stream, header, 8);
 
-    for (i = 0; i < block_count; i++)
-    {
+    for (i = 0; i < block_count; i++) {
         memset(input, 0, 8);
-        (void)php_stream_read(input_stream, input, 8);
+
+        if (i + 1 == block_count && fill > 0) { /* The last block not enough 8 bytes */
+            memcpy(input, &codes_str[i * 8], fill);
+        } else {
+            memcpy(input, &codes_str[i * 8], 8);
+        }
+
         DES_encipher(input, output, key);
         php_stream_write(output_stream, output, 8);
     }
 
-    php_stream_close(input_stream);
     php_stream_close(output_stream);
+    zval_dtor(&codes);
 
     return 0;
 }
@@ -224,115 +274,236 @@ int encrypt_file(const char *inputfile, const char *outputfile,
 *                                                                            *
 *****************************************************************************/
 
-int decrypt_file_return_buffer(const char *inputfile, const char *key,
-        char **buffer, int *filesize TSRMLS_DC)
+int decrypt_file_return_buffer(int stream, const char *key,
+    char **retbuf, int *rsize, int *need_free TSRMLS_DC)
 {
-    int stream;
     struct stat stat_ssb;
     cache_key_t ckey;
     cache_item_t *citem;
-    int fsize, bsize, msize, i;
+    int file_size, block_size, mem_size, i, n;
     char input[8];
     char header[8];
-    char *text, *script;
-
-    /* open file */
-    stream = __beast_fopen(inputfile);
-    if (stream == -1) {
-        return -1;
-    }
+    char *buffer, *script;
 
     if (fstat(stream, &stat_ssb) == -1) {
-        __beast_fclose(stream);
         return -1;
     }
 
     /* here not set file size because find cache not need file size */
     ckey.device = stat_ssb.st_dev;
-    ckey.inode = stat_ssb.st_ino;
-    ckey.mtime = stat_ssb.st_mtime;
+    ckey.inode  = stat_ssb.st_ino;
+    ckey.mtime  = stat_ssb.st_mtime;
 
     citem = beast_cache_find(&ckey); /* find cache */
 
-    if (citem) { /* found cache */
-        __beast_fclose(stream); /* close file */
-
-        *buffer = beast_cache_cdata(citem);
-        *filesize = beast_cache_fsize(citem) + 3;
-
+    if (citem != NULL) {  /* found cache, return */
+        *retbuf = beast_cache_cdata(citem);
+        *rsize  = beast_cache_fsize(citem) + 3; /* includes " ?>" */
+        *need_free = 0;
         cache_hits++;
         return 0;
     }
 
-    /* not found cache */
+    /* Not found cache */
+
+    if (read(stream, header, 8) != 8 ||
+          (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
+          (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
+    {
+        return -1;
+    }
+
+    file_size = *((int *)&header[4]); /* Get file size */
+
+    /* If computer is little endian, change file size to little endian */
+    if (little_endian()) {
+        file_size = swab32(file_size);
+    }
+
+    /* Compute DES blocks */
+    if (file_size % 8 == 0) {
+        block_size = file_size / 8;   
+    } else {
+        block_size = file_size / 8 + 1;
+    }
+
+    mem_size = block_size * 8 + 3;  /* How many memory would alloc */
+    ckey.fsize = file_size;
+
+    citem = beast_cache_create(&ckey, mem_size);
+    if (NULL == citem) {
+        if (NULL == (buffer = malloc(mem_size))) {
+            php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
+            return -1;
+        }
+        *need_free = 1; /* must be free when compile the string */
+
+    } else {
+        buffer = beast_cache_cdata(citem);
+        *need_free = 0;
+    }
+
+    /* Closing php script environment " ?>" */
+    buffer[0] = ' ';
+    buffer[1] = '?';
+    buffer[2] = '>';
+
+    /* Starting decrypt file */
+
+    script = &buffer[3];
+
+    for (i = 0; i < block_size; i++) {
+        n = read(stream, input, 8);
+        DES_decipher(input, &(script[i * 8]), key);
+    }
+
+    if (NULL != citem) {
+        citem   = beast_cache_push(citem); /* push into cache item to manager */
+        *retbuf = beast_cache_cdata(citem);
+        *rsize  = beast_cache_fsize(citem) + 3;
+
+    } else {
+        *retbuf = buffer;
+        *rsize  = file_size + 3;
+    }
+
+    cache_miss++;
+
+    return 0;
+}
+
+
+/*
+ * used cache
+ */
+zend_op_array * 
+cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
+{
+    char *buffer, *file_path, *opened_path;
+    int fd = -1;
+    FILE *fp = NULL;
+    int file_size;
+    int need_free = 0;
+    zval pv;
+    zend_op_array *new_op_array;
+    int dummy = 1;
+
+    /* Open the file */
+    fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+    if (fp != NULL) {
+        fd = fileno(fp);
+    }
+
+    /* Decrypt */
+    if (fp == NULL || decrypt_file_return_buffer(fd, __authkey, &buffer,
+        &file_size, &need_free TSRMLS_CC) != 0)
+    {
+        if (fp != NULL) {
+            fclose(fp);
+        }
+        return old_compile_file(h, type TSRMLS_CC);
+    }
+
+    /*
+     * close file descriptor when beast decrypt success
+     */
+    if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
+    if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
+
+    if (h->opened_path) {
+        file_path = h->opened_path;
+    } else {
+        file_path = h->filename;
+    }
+
+    pv.value.str.len = file_size;
+    pv.value.str.val = buffer;
+    pv.type = IS_STRING;
+
+    new_op_array = compile_string(&pv, file_path TSRMLS_CC);
+
+#if 0
+    if (new_op_array) {
+        /* add current file to included_files */
+        zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
+            (void *)&dummy, sizeof(int), NULL);
+    }
+#endif
+
+    if (need_free) {
+        free(buffer);
+    }
+
+    fclose(fp);
+
+    return new_op_array;
+}
+
+
+/*
+ * don't used cache
+ */
+zend_op_array *
+cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
+{
+    int stream;
+    FILE *fp = NULL;
+    int file_size, block_size, mem_size, i;
+    char input[8];
+    char header[8];
+    char *buffer, *script, *file_path, *opened_path;
+    zval pv;
+    zend_op_array *new_op_array;
+    int dummy = 1, n;
+
+    fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+    if (fp != NULL) {
+        stream = fileno(fp);
+    } else {
+        return old_compile_file(h, type TSRMLS_CC);
+    }
 
     if (read(stream, header, 8) != 8 ||
          (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
          (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
     {
-        __beast_fclose(stream); /* close file */
-        return -1;
+        fclose(fp);
+        return old_compile_file(h, type TSRMLS_CC);
     }
 
-    fsize = *((int *)&header[4]);
+    file_size = *((int *)&header[4]);
 
     /* if computer is little endian, change file size to little endian */
 
     if (little_endian()) {
-        fsize = swab32(fsize);
+        file_size = swab32(file_size);
     }
 
-    bsize = fsize / 8 + 1; /* block count */
-    msize = bsize * 8 + 3;
+    block_size = file_size / 8 + 1; /* block count */
+    mem_size = block_size * 8 + 3; /* how many memorys would alloc */
 
-    ckey.fsize = fsize; /* set file size */
-
-    citem = beast_cache_create(&ckey, msize);
-    if (!citem) {
-        __beast_fclose(stream); /* close file */
-        php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                               "Unable alloc memory for cache");
-        return -1;
-    }
-
-    text = beast_cache_cdata(citem);
-
-    /* For closing php script environment " ?>" */
-    text[0] = ' ';
-    text[1] = '?';
-    text[2] = '>';
-
-    script = &text[3];
-    for (i = 0; i < bsize; i++) {
-        read(stream, input, 8);
-        DES_decipher(input, &(script[i * 8]), key);
-    }
-
-    __beast_fclose(stream); /* close file */
-
-    citem = beast_cache_push(citem); /* push into cache item to manager */
-
-    *buffer = beast_cache_cdata(citem);
-    *filesize = beast_cache_fsize(citem) + 3;
-
-    cache_miss++;
-    return 0;
-}
-
-
-zend_op_array* 
-my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
-{
-    char *script, *file_path;
-    int fsize;
-    zval pv;
-    zend_op_array *new_op_array;
-
-    if (decrypt_file_return_buffer(h->filename, __authkey, &script, 
-            &fsize TSRMLS_CC) != 0)
-    {
+    if (NULL == (buffer = malloc(mem_size))) {
+        fclose(fp);
+        php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
         return old_compile_file(h, type TSRMLS_CC);
     }
+
+    /* closing php script environment " ?>" */
+
+    buffer[0] = ' ';
+    buffer[1] = '?';
+    buffer[2] = '>';
+
+    script = &buffer[3];
+
+    for (i = 0; i < block_size; i++) {
+        n = read(stream, input, 8);
+        DES_decipher(input, &(script[i * 8]), __authkey);
+    }
+
+    fclose(fp);
+
+    /* finish decrypt file, do compile */
 
     if (h->opened_path) {
         file_path = h->opened_path;
@@ -344,11 +515,21 @@ my_compile_file(zend_file_handle* h, int type TSRMLS_DC)
     if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
     if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
 
-    pv.value.str.len = fsize;
-    pv.value.str.val = script;
+    pv.value.str.len = file_size + 3;
+    pv.value.str.val = buffer;
     pv.type = IS_STRING;
 
     new_op_array = compile_string(&pv, file_path TSRMLS_CC);
+
+#if 0
+    if (new_op_array) {
+        /* add current file to included_files */
+        zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
+            (void *)&dummy, sizeof(int), NULL);
+    }
+#endif
+
+    free(buffer);
 
     return new_op_array;
 }
@@ -437,26 +618,6 @@ ZEND_INI_MH(php_beast_log_file)
     return SUCCESS;
 }
 
-ZEND_INI_MH(php_beast_lock_path)
-{
-    if (new_value_length == 0) {
-        return FAILURE;
-    }
-
-    while (new_value[new_value_length] == '/') {
-        new_value_length--;
-    }
-
-    beast_lock_path = malloc(new_value_length + 1);
-    if (beast_lock_path == NULL) {
-        return FAILURE;
-    }
-
-    memcpy(beast_lock_path, new_value, new_value_length);
-    beast_lock_path[new_value_length] = '\0';
-
-    return SUCCESS;
-}
 
 ZEND_INI_MH(php_beast_enable)
 {
@@ -464,7 +625,7 @@ ZEND_INI_MH(php_beast_enable)
         return FAILURE;
     }
 
-    if (!strcasecmp(new_value, "on")) {
+    if (!strcasecmp(new_value, "on") || !strcmp(new_value, "1")) {
         beast_enable = 1;
     } else {
         beast_enable = 0;
@@ -479,9 +640,7 @@ PHP_INI_BEGIN()
           php_beast_cache_size)
     PHP_INI_ENTRY("beast.log_file", "/tmp/beast.log", PHP_INI_ALL,
           php_beast_log_file)
-    PHP_INI_ENTRY("beast.lock_path", "/tmp/", PHP_INI_ALL,
-          php_beast_lock_path)
-    PHP_INI_ENTRY("beast.enable", "On", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.enable", "1", PHP_INI_ALL,
           php_beast_enable)
 PHP_INI_END()
 
@@ -499,16 +658,32 @@ PHP_MINIT_FUNCTION(beast)
         return SUCCESS;
     }
 
-    if (beast_cache_init(max_cache_size) == -1 ||
-        beast_log_init(beast_log_file) == -1)
-    {
-        php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                           "Unable initialize cache for beast");
-        return FAILURE;
+    if (!strcasecmp(sapi_module.name, "cli")) { /* cli module */
+        beast_cli_module = 1;
     }
 
-    old_compile_file = zend_compile_file;
-    zend_compile_file = my_compile_file;
+    if (!beast_cli_module) {
+
+        if (beast_cache_init(max_cache_size) == -1 ||
+            beast_log_init(beast_log_file) == -1)
+        {
+            php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                                           "Unable initialize cache for beast");
+            return FAILURE;
+        }
+    
+        old_compile_file = zend_compile_file;
+        zend_compile_file = cgi_compile_file;
+    
+        beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
+        if (beast_ncpu <= 0) {
+            beast_ncpu = 1;
+        }
+
+    } else {
+        old_compile_file = zend_compile_file;
+        zend_compile_file = cli_compile_file;
+    }
 
     return SUCCESS;
 }
@@ -525,8 +700,10 @@ PHP_MSHUTDOWN_FUNCTION(beast)
         return SUCCESS;
     }
 
-    beast_cache_destroy();
-    beast_log_destroy();
+    if (!beast_cli_module) {
+        beast_cache_destroy();
+        beast_log_destroy();
+    }
 
     zend_compile_file = old_compile_file;
 
@@ -534,7 +711,6 @@ PHP_MSHUTDOWN_FUNCTION(beast)
 }
 /* }}} */
 
-/* Remove if there's nothing to do at request start */
 /* {{{ PHP_RINIT_FUNCTION
  */
 PHP_RINIT_FUNCTION(beast)
@@ -543,7 +719,6 @@ PHP_RINIT_FUNCTION(beast)
 }
 /* }}} */
 
-/* Remove if there's nothing to do at request end */
 /* {{{ PHP_RSHUTDOWN_FUNCTION
  */
 PHP_RSHUTDOWN_FUNCTION(beast)
@@ -557,7 +732,7 @@ PHP_RSHUTDOWN_FUNCTION(beast)
 PHP_MINFO_FUNCTION(beast)
 {
     php_info_print_table_start();
-    php_info_print_table_header(2, "beast support", "enabled");
+    php_info_print_table_header(2, "beast V1.3 support", "enabled");
     php_info_print_table_end();
 
     DISPLAY_INI_ENTRIES();
@@ -636,3 +811,4 @@ PHP_FUNCTION(beast_cache_info)
  * vim600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
+
