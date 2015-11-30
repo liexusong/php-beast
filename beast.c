@@ -275,31 +275,30 @@ int encrypt_file(const char *inputfile, const char *outputfile,
 *****************************************************************************/
 
 int decrypt_file_return_buffer(int stream, const char *key,
-    char **retbuf, int *rsize, int *need_free TSRMLS_DC)
+    char **retbuf, int *rsize, int *free_buffer TSRMLS_DC)
 {
     struct stat stat_ssb;
     cache_key_t ckey;
     cache_item_t *citem;
-    int file_size, block_size, mem_size, i, n;
+    int file_size, block_size, alloc_size, i, n;
     char input[8];
     char header[8];
-    char *buffer, *script;
+    char *buffer;
 
     if (fstat(stream, &stat_ssb) == -1) {
         return -1;
     }
 
-    /* here not set file size because find cache not need file size */
     ckey.device = stat_ssb.st_dev;
     ckey.inode  = stat_ssb.st_ino;
     ckey.mtime  = stat_ssb.st_mtime;
 
-    citem = beast_cache_find(&ckey); /* find cache */
+    citem = beast_cache_find(&ckey);
 
-    if (citem != NULL) {  /* found cache, return */
+    if (citem != NULL) {
         *retbuf = beast_cache_cdata(citem);
-        *rsize  = beast_cache_fsize(citem) + 3; /* includes " ?>" */
-        *need_free = 0;
+        *rsize  = beast_cache_fsize(citem);
+        *free_buffer = 0;
         cache_hits++;
         return 0;
     }
@@ -313,7 +312,7 @@ int decrypt_file_return_buffer(int stream, const char *key,
         return -1;
     }
 
-    file_size = *((int *)&header[4]); /* Get file size */
+    file_size = *((int *)&header[4]); /* File size */
 
     /* If computer is little endian, change file size to little endian */
     if (little_endian()) {
@@ -327,44 +326,37 @@ int decrypt_file_return_buffer(int stream, const char *key,
         block_size = file_size / 8 + 1;
     }
 
-    mem_size = block_size * 8 + 3;  /* How many memory would alloc */
+    alloc_size = block_size * 8;
     ckey.fsize = file_size;
 
-    citem = beast_cache_create(&ckey, mem_size);
+    citem = beast_cache_create(&ckey, alloc_size);
     if (NULL == citem) {
-        if (NULL == (buffer = malloc(mem_size))) {
+        if (NULL == (buffer = malloc(alloc_size))) {
             php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
             return -1;
         }
-        *need_free = 1; /* must be free when compile the string */
+
+        *free_buffer = 1;
 
     } else {
         buffer = beast_cache_cdata(citem);
-        *need_free = 0;
+        *free_buffer = 0;
     }
 
-    /* Closing php script environment " ?>" */
-    buffer[0] = ' ';
-    buffer[1] = '?';
-    buffer[2] = '>';
-
-    /* Starting decrypt file */
-
-    script = &buffer[3];
-
+    /* Decrypt file */
     for (i = 0; i < block_size; i++) {
         n = read(stream, input, 8);
-        DES_decipher(input, &(script[i * 8]), key);
+        DES_decipher(input, &(buffer[i * 8]), key);
     }
 
     if (NULL != citem) {
-        citem   = beast_cache_push(citem); /* push into cache item to manager */
+        citem   = beast_cache_push(citem);
         *retbuf = beast_cache_cdata(citem);
-        *rsize  = beast_cache_fsize(citem) + 3;
+        *rsize  = beast_cache_fsize(citem);
 
     } else {
         *retbuf = buffer;
-        *rsize  = file_size + 3;
+        *rsize  = file_size;
     }
 
     cache_miss++;
@@ -374,164 +366,58 @@ int decrypt_file_return_buffer(int stream, const char *key,
 
 
 /*
- * used cache
+ * CGI compile file
  */
 zend_op_array * 
 cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 {
-    char *buffer, *file_path, *opened_path;
-    int fd = -1;
-    FILE *fp = NULL;
-    int file_size;
-    int need_free = 0;
-    zval pv;
-    zend_op_array *new_op_array;
-    int dummy = 1;
+    char *opened_path, *buffer;
+    int fd;
+    FILE *filep = NULL;
+    int size, free_buffer = 0;
+    int shadow[2]= {-1, -1};
+    int retval;
 
-    /* Open the file */
-    fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
-    if (fp != NULL) {
-        fd = fileno(fp);
+    filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+     if (filep != NULL) {
+         fd = fileno(filep);
+     } else {
+        goto final;
+     }
+
+    retval = decrypt_file_return_buffer(fd, __authkey, &buffer,
+         &size, &free_buffer TSRMLS_CC);
+    if (retval != 0 || pipe(shadow) != 0) {
+        goto final;
     }
 
-    /* Decrypt */
-    if (fp == NULL || decrypt_file_return_buffer(fd, __authkey, &buffer,
-        &file_size, &need_free TSRMLS_CC) != 0)
-    {
-        if (fp != NULL) {
-            fclose(fp);
-        }
-        return old_compile_file(h, type TSRMLS_CC);
+    if (write(shadow[1], buffer, size) != size) {
+        goto final;
     }
 
-    /*
-     * close file descriptor when beast decrypt success
-     */
     if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
     if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
 
-    if (h->opened_path) {
-        file_path = h->opened_path;
-    } else {
-        file_path = h->filename;
-    }
-
-    pv.value.str.len = file_size;
-    pv.value.str.val = buffer;
-    pv.type = IS_STRING;
-
-    new_op_array = compile_string(&pv, file_path TSRMLS_CC);
-
-#if 0
-    if (new_op_array) {
-        /* add current file to included_files */
-        zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
-            (void *)&dummy, sizeof(int), NULL);
-    }
-#endif
-
-    if (need_free) {
-        free(buffer);
-    }
-
-    fclose(fp);
-
-    return new_op_array;
-}
-
-
-/*
- * don't used cache
- */
-zend_op_array *
-cli_compile_file(zend_file_handle *h, int type TSRMLS_DC)
-{
-    int stream;
-    FILE *fp = NULL;
-    int file_size, block_size, mem_size, i;
-    char input[8];
-    char header[8];
-    char *buffer, *script, *file_path, *opened_path;
-    zval pv;
-    zend_op_array *new_op_array;
-    int dummy = 1, n;
-
-    fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
-    if (fp != NULL) {
-        stream = fileno(fp);
-    } else {
-        return old_compile_file(h, type TSRMLS_CC);
-    }
-
-    if (read(stream, header, 8) != 8 ||
-         (header[0] & 0xFF) != CHR1 || (header[1] & 0xFF) != CHR2 ||
-         (header[2] & 0xFF) != CHR3 || (header[3] & 0xFF) != CHR4)
-    {
-        fclose(fp);
-        return old_compile_file(h, type TSRMLS_CC);
-    }
-
-    file_size = *((int *)&header[4]);
-
-    /* if computer is little endian, change file size to little endian */
-
-    if (little_endian()) {
-        file_size = swab32(file_size);
-    }
-
-    block_size = file_size / 8 + 1; /* block count */
-    mem_size = block_size * 8 + 3; /* how many memorys would alloc */
-
-    if (NULL == (buffer = malloc(mem_size))) {
-        fclose(fp);
-        php_error_docref(NULL TSRMLS_CC, E_ERROR, "Out of memory");
-        return old_compile_file(h, type TSRMLS_CC);
-    }
-
-    /* closing php script environment " ?>" */
-
-    buffer[0] = ' ';
-    buffer[1] = '?';
-    buffer[2] = '>';
-
-    script = &buffer[3];
-
-    for (i = 0; i < block_size; i++) {
-        n = read(stream, input, 8);
-        DES_decipher(input, &(script[i * 8]), __authkey);
-    }
-
-    fclose(fp);
-
-    /* finish decrypt file, do compile */
-
-    if (h->opened_path) {
-        file_path = h->opened_path;
-    } else {
-        file_path = h->filename;
-    }
-
-    /* close file descriptor when beast decrypt success */
-    if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
-    if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
-
-    pv.value.str.len = file_size + 3;
-    pv.value.str.val = buffer;
-    pv.type = IS_STRING;
-
-    new_op_array = compile_string(&pv, file_path TSRMLS_CC);
-
-#if 0
-    if (new_op_array) {
-        /* add current file to included_files */
-        zend_hash_add(&EG(included_files), file_path, strlen(file_path)+1,
-            (void *)&dummy, sizeof(int), NULL);
-    }
-#endif
+    h->type = ZEND_HANDLE_FD;
+    h->handle.fd = shadow[0];
 
     free(buffer);
+    fclose(filep);
+    close(shadow[1]);
 
-    return new_op_array;
+    return old_compile_file(h, type, TSRMLS_CC);
+
+final:
+    if (free_buffer)
+        free(buffer);
+    if (filep != NULL)
+        fclose(filep);
+    if (shadow[0] != -1)
+        close(shadow[0]);
+    if (shadow[1] != -1)
+        close(shadow[1]);
+
+    return old_compile_file(h, type, TSRMLS_CC);
 }
 
 
@@ -658,31 +544,20 @@ PHP_MINIT_FUNCTION(beast)
         return SUCCESS;
     }
 
-    if (!strcasecmp(sapi_module.name, "cli")) { /* cli module */
-        beast_cli_module = 1;
+    if (beast_cache_init(max_cache_size) == -1
+        || beast_log_init(beast_log_file) == -1)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                                       "Unable initialize cache for beast");
+        return FAILURE;
     }
 
-    if (!beast_cli_module) {
+    old_compile_file = zend_compile_file;
+    zend_compile_file = cgi_compile_file;
 
-        if (beast_cache_init(max_cache_size) == -1 ||
-            beast_log_init(beast_log_file) == -1)
-        {
-            php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                           "Unable initialize cache for beast");
-            return FAILURE;
-        }
-    
-        old_compile_file = zend_compile_file;
-        zend_compile_file = cgi_compile_file;
-    
-        beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
-        if (beast_ncpu <= 0) {
-            beast_ncpu = 1;
-        }
-
-    } else {
-        old_compile_file = zend_compile_file;
-        zend_compile_file = cli_compile_file;
+    beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
+    if (beast_ncpu <= 0) {
+        beast_ncpu = 1;
     }
 
     return SUCCESS;
