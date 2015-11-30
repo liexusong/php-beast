@@ -615,7 +615,7 @@ PHP_RSHUTDOWN_FUNCTION(beast)
 PHP_MINFO_FUNCTION(beast)
 {
     php_info_print_table_start();
-    php_info_print_table_header(2, "beast V1.3 support", "enabled");
+    php_info_print_table_header(2, "beast V1.5 support", "enabled");
     php_info_print_table_end();
 
     DISPLAY_INI_ENTRIES();
