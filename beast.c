@@ -405,7 +405,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     fclose(filep);
     close(shadow[1]);
 
-    return old_compile_file(h, type, TSRMLS_CC);
+    return old_compile_file(h, type TSRMLS_CC);
 
 final:
     if (free_buffer)
@@ -417,7 +417,7 @@ final:
     if (shadow[1] != -1)
         close(shadow[1]);
 
-    return old_compile_file(h, type, TSRMLS_CC);
+    return old_compile_file(h, type TSRMLS_CC);
 }
 
 
