@@ -374,8 +374,8 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     char *opened_path, *buffer;
     int fd;
     FILE *filep = NULL;
-    int size, free_buffer = 0;
-    int shadow[2]= {-1, -1};
+    int size, free_buffer = 0, destroy_read_shadow = 1;
+    int shadow[2]= {0, 0};
     int retval;
 
     filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
@@ -391,6 +391,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         goto final;
     }
 
+    /* write data to shadow file */
     if (write(shadow[1], buffer, size) != size) {
         goto final;
     }
@@ -401,21 +402,28 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     h->type = ZEND_HANDLE_FD;
     h->handle.fd = shadow[0];
 
-    free(buffer);
-    fclose(filep);
-    close(shadow[1]);
-
-    return old_compile_file(h, type TSRMLS_CC);
+    /**
+     * zend_compile_file() function would using this file,
+     * so don't destroy it.
+     */
+    destroy_read_shadow = 0;
 
 final:
-    if (free_buffer)
+    if (free_buffer) {
         free(buffer);
-    if (filep != NULL)
+    }
+
+    if (filep) {
         fclose(filep);
-    if (shadow[0] != -1)
-        close(shadow[0]);
-    if (shadow[1] != -1)
+    }
+
+    if (shadow[1]) {
         close(shadow[1]);
+    }
+
+    if (destroy_read_shadow && shadow[0]) {
+        close(shadow[0]);
+    }
 
     return old_compile_file(h, type TSRMLS_CC);
 }
