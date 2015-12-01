@@ -70,6 +70,7 @@ static int cache_hits = 0;
 static int cache_miss = 0;
 static int beast_enable = 1;
 static int beast_cli_module = 0;
+static int beast_max_filesize = 0;
 
 /* {{{ beast_functions[]
  *
@@ -214,6 +215,11 @@ int encrypt_file(const char *inputfile, const char *outputfile,
 
     file_size = codes.value.str.len;
     codes_str = codes.value.str.val;
+
+    /* PHP file size can not large than beast_max_filesize */
+    if (file_size > beast_max_filesize) {
+        return -1;
+    }
 
     /* Open output file */
     output_stream = php_stream_open_wrapper((char *)outputfile, "w+",
@@ -541,16 +547,45 @@ PHP_INI_END()
 /* }}} */
 
 
+int set_nonblock(int fd)
+{
+    int flags;
+
+    if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
+        return -1;
+    }
+    return 0;
+}
+
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(beast)
 {
+    int fds[2];
+
     /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
 
     if (!beast_enable) {
         return SUCCESS;
     }
+
+    /* Check module support the max file size */
+    if (pipe(fds) != 0 || set_nonblock(fds[1]) != 0) {
+        return FAILURE;
+    }
+
+    while (1) {
+        if (write(fds[1], "", 1) != 1) {
+            break;
+        }
+        beast_max_filesize++;
+    }
+
+    close(fds[0]);
+    close(fds[1]);
 
     if (beast_cache_init(max_cache_size) == -1
         || beast_log_init(beast_log_file) == -1)
