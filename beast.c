@@ -50,6 +50,8 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_log.h"
 
 
+#define BEAST_VERSION  "1.5"
+
 #define DEFAULT_CACHE_SIZE  1048576
 
 
@@ -69,7 +71,6 @@ static int max_cache_size = DEFAULT_CACHE_SIZE;
 static int cache_hits = 0;
 static int cache_miss = 0;
 static int beast_enable = 1;
-static int beast_cli_module = 0;
 static int beast_max_filesize = 0;
 
 /* {{{ beast_functions[]
@@ -98,7 +99,7 @@ zend_module_entry beast_module_entry = {
     PHP_RSHUTDOWN(beast),
     PHP_MINFO(beast),
 #if ZEND_MODULE_API_NO >= 20010901
-    "1.5", /* Replace with version number for your extension */
+    BEAST_VERSION, /* Replace with version number for your extension */
 #endif
     STANDARD_MODULE_PROPERTIES
 };
@@ -590,8 +591,8 @@ PHP_MINIT_FUNCTION(beast)
     if (beast_cache_init(max_cache_size) == -1
         || beast_log_init(beast_log_file) == -1)
     {
-        php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                       "Unable initialize cache for beast");
+        php_error_docref(NULL TSRMLS_CC, 
+                         E_ERROR, "Unable initialize cache for beast");
         return FAILURE;
     }
 
@@ -618,10 +619,8 @@ PHP_MSHUTDOWN_FUNCTION(beast)
         return SUCCESS;
     }
 
-    if (!beast_cli_module) {
-        beast_cache_destroy();
-        beast_log_destroy();
-    }
+    beast_cache_destroy();
+    beast_log_destroy();
 
     zend_compile_file = old_compile_file;
 
@@ -650,7 +649,8 @@ PHP_RSHUTDOWN_FUNCTION(beast)
 PHP_MINFO_FUNCTION(beast)
 {
     php_info_print_table_start();
-    php_info_print_table_header(2, "beast V1.5 support", "enabled");
+    php_info_print_table_header(2,
+        "beast V" BEAST_VERSION " support", "enabled");
     php_info_print_table_end();
 
     DISPLAY_INI_ENTRIES();
