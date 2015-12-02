@@ -36,10 +36,10 @@ $ sudo make && make install
 </code></pre>
 
 <p>使用php-beast的性能：<br/>
-<img src="https://raw.githubusercontent.com/liexusong/php-beast/master/images/beast1.png" /></p>
+<img src="http://git.oschina.net/liexusong/php-beast/raw/master/images/beast1.png?dir=0&filepath=images/beast1.png&oid=645b87003dada2eac4f1a9fcfd353aa0423f5711&sha=7ec2a0ddc7780b2bab538d9f49d8b262f1bc37b7" /></p>
 
 <p>不使用php-beast的性能：<br/>
-<img src="https://raw.githubusercontent.com/liexusong/php-beast/master/images/beast2.png" /></p>
+<img src="http://git.oschina.net/liexusong/php-beast/raw/master/images/beast2.png?dir=0&filepath=images/beast2.png&oid=3f07cff6dca34b22d8933ab0ea1740a0e4f37e34&sha=7ec2a0ddc7780b2bab538d9f49d8b262f1bc37b7" /></p>
 
 配置项:
 <pre><code>
@@ -76,4 +76,3 @@ win32文件夹中是win版本的加密模块, 但是因为没有缓存, 所以�
 <b>提供安装配置服务和定制版本, 请联系QQ: 280259971</b><br/>
 捐赠本项目: <img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" />
 ------------------------------
-
