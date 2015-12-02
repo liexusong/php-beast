@@ -78,9 +78,10 @@ static int beast_max_filesize = 0;
  * Every user visible function must have an entry in beast_functions[].
  */
 zend_function_entry beast_functions[] = {
-    PHP_FE(beast_encode_file, NULL)
-    PHP_FE(beast_avail_cache, NULL)
-    PHP_FE(beast_cache_info,  NULL)
+    PHP_FE(beast_encode_file,      NULL)
+    PHP_FE(beast_avail_cache,      NULL)
+    PHP_FE(beast_cache_info,       NULL)
+    PHP_FE(beast_support_filesize, NULL)
     {NULL, NULL, NULL}    /* Must be the last line in beast_functions[] */
 };
 /* }}} */
@@ -716,6 +717,12 @@ PHP_FUNCTION(beast_cache_info)
 
     add_assoc_long(return_value, "cache_hits", cache_hits);
     add_assoc_long(return_value, "cache_miss", cache_miss);
+}
+
+
+PHP_FUNCTION(beast_support_filesize)
+{
+    RETURN_LONG(beast_max_filesize);
 }
 
 /* }}} */
