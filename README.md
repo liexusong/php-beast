@@ -35,6 +35,11 @@ $ sudo make && make install
             2) 可以修改key.c文件中的加密key
 </code></pre>
 
+<p>使用php-beast的性能：<br/>
+<img src="https://raw.githubusercontent.com/liexusong/php-beast/master/images/beast1.png" /></p>
+
+<p>不使用php-beast的性能：<br/>
+<img src="https://raw.githubusercontent.com/liexusong/php-beast/master/images/beast2.png" /></p>
 
 配置项:
 <pre><code>
