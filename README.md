@@ -12,9 +12,7 @@
 <b>QQ交流群：239243332</b>
 </p>
 
-<h3>加密算法模块编写教程:</h3>
-<a href="https://github.com/liexusong/php-beast/blob/master/write_a_encrypt_handler_module.md">教程点击</a>
-
+<b>加密算法模块编写教程: <a href="https://github.com/liexusong/php-beast/blob/master/write_a_encrypt_handler_module.md">点击</a></b>
 
 <h3>编译安装如下:</h3>
 <pre><code>
