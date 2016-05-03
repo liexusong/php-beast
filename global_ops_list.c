@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "ops_struct.h"
 
 extern struct beast_ops des_handler_ops;
 
