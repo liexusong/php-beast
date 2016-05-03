@@ -11,7 +11,7 @@
 </code></pre>
 
 <h3>加密算法模块编写教程:</h3>
-<a href="https://github.com/liexusong/php-beast/write_a_encrypt_handler_module.md">教程点击</a>
+<a href="https://github.com/liexusong/php-beast/blob/master/write_a_encrypt_handler_module.md">教程点击</a>
 
 
 编译安装如下:
@@ -27,10 +27,7 @@ $ sudo make && make install
 
 编译好之后修改php.ini配置文件, 加入配置项: extension=beast.so, 重启php-fpm
 
-<pre><code>
-  温馨提示: 1) 缓存设置越大, 效率越高
-            2) 可以修改key.c文件中的加密key
-</code></pre>
+<pre>温馨提示: 可以设置较大的缓存提高效率</pre>
 
 <p>使用php-beast的性能：<br/>
 <img src="http://git.oschina.net/liexusong/php-beast/raw/master/images/beast1.png?dir=0&filepath=images/beast1.png&oid=645b87003dada2eac4f1a9fcfd353aa0423f5711&sha=7ec2a0ddc7780b2bab538d9f49d8b262f1bc37b7" /></p>
