@@ -14,8 +14,7 @@
 <a href="https://github.com/liexusong/php-beast/blob/master/write_a_encrypt_handler_module.md">教程点击</a>
 
 
-编译安装如下:
--------------
+<h3>编译安装如下:</h3>
 <pre><code>
 $ wget https://github.com/liexusong/php-beast/archive/master.zip
 $ unzip master.zip
