@@ -399,9 +399,9 @@ int decrypt_file(int stream, char **retbuf,
         }
 
     } else {
-        *free_buffer = 1;
         *retbuf = decbuf;
         *retlen = reallen;
+        *free_buffer = 1;
     }
 
     cache_miss++;
@@ -429,7 +429,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     int size, free_buffer = 0, destroy_read_shadow = 1;
     int shadow[2]= {0, 0};
     int retval;
-    struct beast_ops *ops = beast_get_default_ops(default_ops_name);
+    struct beast_ops *ops;
 
     filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
      if (filep != NULL) {
@@ -461,8 +461,11 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     destroy_read_shadow = 0;
 
 final:
-    if (free_buffer && ops->free) {
-        ops->free(buffer);
+    if (free_buffer) {
+        ops = beast_get_default_ops(default_ops_name);
+        if (ops && ops->free) {
+            ops->free(buffer);
+        }
     }
 
     if (filep) {
