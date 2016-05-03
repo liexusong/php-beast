@@ -1,5 +1,5 @@
 /**
- * DES algorithms handler for php-beast
+ * DES encrypt algorithms handler module for Beast
  * @author: liexusong
  */
 

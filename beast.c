@@ -51,7 +51,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
 
 #define BEAST_VERSION  "2.0"
-
 #define DEFAULT_CACHE_SIZE  1048576
 
 
@@ -285,7 +284,7 @@ int encrypt_file(const char *inputfile, const char *outputfile TSRMLS_DC)
         *((int *)&header[4]) = inlen;
     }
 
-    php_stream_write(output_stream, header, 8);
+    php_stream_write(output_stream, header, 8 * sizeof(char));
 
     if (ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
@@ -321,14 +320,14 @@ int decrypt_file(int stream, char **retbuf,
     struct stat stat_ssb;
     cache_key_t findkey;
     cache_item_t *cache;
-    int fsize, blocks, orig_size, i, n;
-    char input[8];
+    int reallen, bodylen;
     char header[8];
-    char *buffer = NULL, *debuf;
-    int delen;
+    int headerlen;
+    char *buffer = NULL, *decbuf;
+    int declen;
     struct beast_ops *ops = beast_get_default_ops(default_ops_name);
 
-    *free_buffer = 0;
+    *free_buffer = 0; /* set free buffer flag to false */
 
     if (fstat(stream, &stat_ssb) == -1) {
         goto failed;
@@ -347,58 +346,62 @@ int decrypt_file(int stream, char **retbuf,
         return 0;
     }
 
-    /* Not found cache */
+    /* not found cache and decrypt file */
 
-    if (read(stream, header, 8) != 8 ||
-          (header[0] & 0xFF) != CHR1 ||
-          (header[1] & 0xFF) != CHR2 ||
-          (header[2] & 0xFF) != CHR3 ||
-          (header[3] & 0xFF) != CHR4)
+    headerlen = 8 * sizeof(char);
+
+    if (read(stream, header, headerlen) != headerlen
+        || (header[0] & 0xFF) != CHR1
+        || (header[1] & 0xFF) != CHR2
+        || (header[2] & 0xFF) != CHR3
+        || (header[3] & 0xFF) != CHR4)
     {
         goto failed;
     }
 
-    fsize = *((int *)&header[4]);
+    reallen = *((int *)&header[4]); /* real php script file's size */
 
     if (little_endian()) {
-        fsize = swab32(fsize);
+        reallen = swab32(reallen);
     }
 
-    if (fsize % 8 == 0) {
-        blocks = fsize / 8;
-    } else {
-        blocks = fsize / 8 + 1;
-    }
+    /**
+     * how many bytes would be read from encrypt file,
+     * subtract encrypt file's header size,
+     * because we had read the header yet.
+     */
 
-    orig_size = blocks * 8;
+    bodylen = stat_ssb.st_size - headerlen;
 
-    if (!(buffer = malloc(orig_size))
-        || read(stream, buffer, orig_size) != orig_size
-        || ops->decrypt(buffer, orig_size, &debuf, &delen) == -1)
+    if (!(buffer = malloc(bodylen))
+        || read(stream, buffer, bodylen) != bodylen
+        || ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1)
     {
         goto failed;
     }
 
-    free(buffer); /* Buffer don't need right now and free it */
+    free(buffer); /* buffer don't need right now and free it */
 
-    findkey.fsize = fsize;
+    findkey.fsize = reallen;
 
+    /* try add decrypt result to cache */
     if ((cache = beast_cache_create(&findkey))) {
-        memcpy(beast_cache_data(cache), debuf, fsize);
 
-        cache = beast_cache_push(cache); /* Push cache into hash table */
+        memcpy(beast_cache_data(cache), decbuf, reallen);
+
+        cache = beast_cache_push(cache); /* push cache into hash table */
 
         *retbuf = beast_cache_data(cache);
         *retlen = beast_cache_size(cache);
 
         if (ops->free) {
-            ops->free(debuf);
+            ops->free(decbuf);
         }
 
     } else {
         *free_buffer = 1;
-        *retbuf = debuf;
-        *retlen = fsize;
+        *retbuf = decbuf;
+        *retlen = reallen;
     }
 
     cache_miss++;
