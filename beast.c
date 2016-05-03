@@ -47,6 +47,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "php_beast.h"
 #include "cache.h"
 #include "beast_log.h"
+#include "algo_ops_struct.h"
 
 
 #define BEAST_VERSION  "2.0"
@@ -144,7 +145,7 @@ int beast_register_ops(struct beast_ops *ops)
     }
 
     ops->next = ops_head;
-    ops_head = op;
+    ops_head = ops;
 
     return 0;
 }
@@ -667,8 +668,8 @@ PHP_MINIT_FUNCTION(beast)
 
     for (ops = ops_handler_list; *ops; ops++) {
         if (beast_register_ops(*ops) == -1) {
-            php_error_docref(NULL TSRMLS_CC,
-              E_ERROR, "Failed to register encrypt algorithms `%s'", ops->name);
+            php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                "Failed to register encrypt algorithms `%s'", (*ops)->name);
             return FAILURE;
         }
     }

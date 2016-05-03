@@ -65,20 +65,6 @@ ZEND_END_MODULE_GLOBALS(beast)
    examples in any other php module directory.
 */
 
-typedef int beast_encrypt_op_t(char *inbuf, int inlen,
-    char **outbuf, char *outlen);
-typedef int beast_decrypt_op_t(char *inbuf, int inlen,
-    char **outbuf, char *outlen);
-typedef void beast_free_buf_t(void *buf);
-
-struct beast_ops {
-    char *name;
-    beast_encrypt_op_t *encrypt;
-    beast_decrypt_op_t *decrypt;
-    beast_free_buf_t *free;
-    struct beast_ops *next;
-};
-
 #ifdef ZTS
 #define BEAST_G(v) TSRMG(beast_globals_id, zend_beast_globals *, v)
 #else
