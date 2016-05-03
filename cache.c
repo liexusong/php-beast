@@ -127,13 +127,13 @@ cache_item_t *beast_cache_find(cache_key_t *key)
 }
 
 
-cache_item_t *beast_cache_create(cache_key_t *key, int size)
+cache_item_t *beast_cache_create(cache_key_t *key)
 {
     cache_item_t *item, *next;
     int i, msize, bsize;
     int pid = (int)getpid();
 
-    msize = sizeof(*item) + size;
+    msize = sizeof(*item) + key->fsize;
     bsize = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
 
     if ((msize + bsize) > beast_mm_realspace()) {
@@ -193,7 +193,7 @@ cache_item_t *beast_cache_push(cache_item_t *item)
     int index = hashval % BUCKETS_DEFAULT_SIZE;
     cache_item_t **this, *self;
     int pid = (int)getpid();
-    
+
     beast_spinlock(cache_lock, pid);
 
 #if 0
@@ -226,7 +226,7 @@ cache_item_t *beast_cache_push(cache_item_t *item)
     beast_cache_buckets[index] = item;
 
     beast_spinunlock(cache_lock, pid);
-    
+
     return item;
 }
 

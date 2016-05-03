@@ -16,12 +16,12 @@ typedef struct cache_item_s {
 } cache_item_t;
 
 
-#define beast_cache_cdata(item)  (item)->data
-#define beast_cache_fsize(item)  (item)->key.fsize
+#define beast_cache_data(item)  (item)->data
+#define beast_cache_size(item)  (item)->key.fsize
 
 int beast_cache_init();
 cache_item_t *beast_cache_find(cache_key_t *key);
-cache_item_t *beast_cache_create(cache_key_t *key, int size);
+cache_item_t *beast_cache_create(cache_key_t *key);
 cache_item_t *beast_cache_push(cache_item_t *item);
 int beast_cache_destroy();
 

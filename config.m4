@@ -45,7 +45,7 @@ if test "$PHP_BEAST" != "no"; then
 
   dnl # --with-beast -> check for lib and symbol presence
   dnl LIBNAME=beast # you may want to change this
-  dnl LIBSYMBOL=beast # you most likely want to change this 
+  dnl LIBSYMBOL=beast # you most likely want to change this
 
   dnl PHP_CHECK_LIBRARY($LIBNAME,$LIBSYMBOL,
   dnl [
@@ -59,5 +59,5 @@ if test "$PHP_BEAST" != "no"; then
   dnl
   dnl PHP_SUBST(BEAST_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(beast, beast.c encrypt.c bit.c beast_mm.c spinlock.c cache.c beast_log.c key.c, $ext_shared)
+  PHP_NEW_EXTENSION(beast, beast.c des_algo_handler.c beast_mm.c spinlock.c cache.c beast_log.c, $ext_shared)
 fi
