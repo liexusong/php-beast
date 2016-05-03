@@ -10,10 +10,8 @@
  QQ交流群：239243332
 </code></pre>
 
-<h3>使用方法:</h3>
-<pre>
-加密算法模块编写教程: <a href="https://github.com/liexusong/php-beast/write_a_encrypt_handler_module.md">click</a>
-</pre>
+<h3>加密算法模块编写教程:</h3>
+<a href="https://github.com/liexusong/php-beast/write_a_encrypt_handler_module.md">教程点击</a>
 
 
 编译安装如下:
