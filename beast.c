@@ -137,10 +137,16 @@ static int big_endian()
 }
 
 
-void beast_register_op(struct beast_ops *ops)
+int beast_register_ops(struct beast_ops *ops)
 {
+    if (!ops->name || !ops->encrypt || !ops->decrypt) {
+        return -1;
+    }
+
     ops->next = ops_head;
     ops_head = op;
+
+    return 0;
 }
 
 
@@ -375,7 +381,7 @@ int decrypt_file(int stream, char **retbuf,
         goto failed;
     }
 
-    free(buffer);
+    free(buffer); /* Buffer don't need right now and free it */
 
     *retbuf = debuf;
     *retlen = fsize;
@@ -596,7 +602,7 @@ PHP_INI_BEGIN()
           php_beast_log_file)
     PHP_INI_ENTRY("beast.enable", "1", PHP_INI_ALL,
           php_beast_enable)
-    PHP_INI_ENTRY("beast.encrypt_handler", "des", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.encrypt_handler", "des-algo", PHP_INI_ALL,
           php_beast_encrypt_handler)
 PHP_INI_END()
 
@@ -661,7 +667,17 @@ PHP_MINIT_FUNCTION(beast)
     }
 
     for (ops = ops_handler_list; *ops; ops++) {
-        beast_register_op(*ops);
+        if (beast_register_ops(*ops) == -1) {
+            php_error_docref(NULL TSRMLS_CC,
+              E_ERROR, "Failed to register encrypt algorithms `%s'", ops->name);
+            return FAILURE;
+        }
+    }
+
+    if (!ops_head) {
+        php_error_docref(NULL TSRMLS_CC,
+                         E_ERROR, "Havn't active encrypt algorithms in system");
+        return FAILURE;
     }
 
     return SUCCESS;
