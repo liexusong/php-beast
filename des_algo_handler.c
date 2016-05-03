@@ -3,6 +3,8 @@
  * @author: liexusong
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include "php_beast.h"
 #include "des_algo.c"
 

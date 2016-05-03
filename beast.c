@@ -641,9 +641,8 @@ PHP_MINIT_FUNCTION(beast)
     }
 
     while (1) {
-        if (write(fds[1], "", 1) != 1) {
+        if (write(fds[1], "", 1) != 1)
             break;
-        }
         beast_max_filesize++;
     }
 
@@ -802,7 +801,6 @@ PHP_FUNCTION(beast_support_filesize)
 
 /* }}} */
 
-
 /*
  * Local variables:
  * tab-width: 4
@@ -811,4 +809,3 @@ PHP_FUNCTION(beast_support_filesize)
  * vim600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
-
