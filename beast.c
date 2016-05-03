@@ -293,13 +293,11 @@ int encrypt_file(const char *inputfile, const char *outputfile TSRMLS_DC)
         goto failed;
     }
 
-    if (ops->free) {
-        ops->free(outbuf);
-    }
-
     php_stream_write(output_stream, outbuf, outlen);
     php_stream_close(output_stream);
     zval_dtor(&codes);
+    if (ops->free)
+        ops->free(outbuf);
     return 0;
 
 failed:
@@ -330,7 +328,7 @@ int decrypt_file(int stream, char **retbuf,
     int delen;
     struct beast_ops *ops = beast_get_default_ops(default_ops_name);
 
-    *free_buffer = 1;
+    *free_buffer = 0;
 
     if (fstat(stream, &stat_ssb) == -1) {
         goto failed;
@@ -345,7 +343,6 @@ int decrypt_file(int stream, char **retbuf,
     if (cache != NULL) { /* found!!! */
         *retbuf = beast_cache_data(cache);
         *retlen = beast_cache_size(cache);
-        *free_buffer = 0;
         cache_hits++;
         return 0;
     }
@@ -384,6 +381,7 @@ int decrypt_file(int stream, char **retbuf,
 
     free(buffer); /* Buffer don't need right now and free it */
 
+    *free_buffer = 1;
     *retbuf = debuf;
     *retlen = fsize;
 
