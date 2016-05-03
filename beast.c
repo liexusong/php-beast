@@ -381,10 +381,6 @@ int decrypt_file(int stream, char **retbuf,
 
     free(buffer); /* Buffer don't need right now and free it */
 
-    *free_buffer = 1;
-    *retbuf = debuf;
-    *retlen = fsize;
-
     findkey.fsize = fsize;
 
     if ((cache = beast_cache_create(&findkey))) {
@@ -399,7 +395,10 @@ int decrypt_file(int stream, char **retbuf,
             ops->free(debuf);
         }
 
-        *free_buffer = 0;
+    } else {
+        *free_buffer = 1;
+        *retbuf = debuf;
+        *retlen = fsize;
     }
 
     cache_miss++;
