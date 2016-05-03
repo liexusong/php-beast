@@ -5,10 +5,12 @@
  |  ___/|  __  |  ___/  |  _ ||  __|   / /\ \  \___ \   | |
  | |    | |  | | |      | |_)\| |____ / ____ \ ____) |  | |
  |_|    |_|  |_|_|      |____/|______/_/    \_\_____/   |_|
-
- 此模块可以用于商业, 可自定义加密算法, 版权归原作者.
- QQ交流群：239243332
 </code></pre>
+
+<pre>
+此模块可以用于商业, 可自定义加密算法, 版权归原作者.
+QQ交流群：239243332
+</pre>
 
 <h3>加密算法模块编写教程:</h3>
 <a href="https://github.com/liexusong/php-beast/blob/master/write_a_encrypt_handler_module.md">教程点击</a>
@@ -22,16 +24,16 @@ $ cd php-beast-master
 $ phpize
 $ ./configure
 $ sudo make && make install
-</code></pre>
 
 编译好之后修改php.ini配置文件, 加入配置项: extension=beast.so, 重启php-fpm
+</code></pre>
 
 <pre>温馨提示: 可以设置较大的缓存提高效率</pre>
 
-<p>使用php-beast的性能：<br/>
+<p><b>使用php-beast的性能：</b><br/><br/>
 <img src="http://git.oschina.net/liexusong/php-beast/raw/master/images/beast1.png?dir=0&filepath=images/beast1.png&oid=645b87003dada2eac4f1a9fcfd353aa0423f5711&sha=7ec2a0ddc7780b2bab538d9f49d8b262f1bc37b7" /></p>
 
-<p>不使用php-beast的性能：<br/>
+<p><b>不使用php-beast的性能：</b><br/><br/>
 <img src="http://git.oschina.net/liexusong/php-beast/raw/master/images/beast2.png?dir=0&filepath=images/beast2.png&oid=3f07cff6dca34b22d8933ab0ea1740a0e4f37e34&sha=7ec2a0ddc7780b2bab538d9f49d8b262f1bc37b7" /></p>
 
 配置项:
@@ -47,9 +49,7 @@ $ sudo make && make install
  Nginx + Fastcgi + (PHP-5.2.x ~ PHP-5.6.x)
 </code></pre>
 
-
-注意
-----
+<h3>注意</h3>
 如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
 
 <pre>
