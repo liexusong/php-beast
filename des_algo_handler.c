@@ -5,7 +5,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "algo_ops_struct.h"
+#include "ops_struct.h"
 #include "des_algo.c"
 
 
