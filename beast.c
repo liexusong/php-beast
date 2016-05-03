@@ -48,12 +48,13 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "cache.h"
 #include "beast_log.h"
 
-#include "algo_handler_ops.h"
-
 
 #define BEAST_VERSION  "2.0"
 
 #define DEFAULT_CACHE_SIZE  1048576
+
+
+extern struct beast_ops *ops_handler_list[];
 
 /*
  * Global vaiables for extension
@@ -618,6 +619,7 @@ int set_nonblock(int fd)
  */
 PHP_MINIT_FUNCTION(beast)
 {
+    struct beast_ops **ops;
     int fds[2];
 
     /* If you have INI entries, uncomment these lines */
@@ -658,7 +660,9 @@ PHP_MINIT_FUNCTION(beast)
         beast_ncpu = 1;
     }
 
-    beast_register_op(&des_handler_ops);
+    for (ops = ops_handler_list; *ops; ops++) {
+        beast_register_op(*ops);
+    }
 
     return SUCCESS;
 }
