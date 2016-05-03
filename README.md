@@ -1,20 +1,18 @@
 <pre><code>
-  _____  _    _ _____    ____  ______           _____ _______ 
+  _____  _    _ _____    ____  ______           _____ _______
  |  __ \| |  | |  __ \  |  _ \|  ____|   /\    / ____|__   __|
- | |__) | |__| | |__) | | |_)/| |__     /  \  | (___    | |   
- |  ___/|  __  |  ___/  |  _ ||  __|   / /\ \  \___ \   | |   
- | |    | |  | | |      | |_)\| |____ / ____ \ ____) |  | |   
- |_|    |_|  |_|_|      |____/|______/_/    \_\_____/   |_|   
- 
+ | |__) | |__| | |__) | | |_)/| |__     /  \  | (___    | |
+ |  ___/|  __  |  ___/  |  _ ||  __|   / /\ \  \___ \   | |
+ | |    | |  | | |      | |_)\| |____ / ____ \ ____) |  | |
+ |_|    |_|  |_|_|      |____/|______/_/    \_\_____/   |_|
+
  此模块可以用于商业, 使用DES加密算法加密, 版权归原作者.
  QQ交流群：239243332
 </code></pre>
 
 <h3>使用方法:</h3>
 <pre>
-修改key.c文件的__authkey加密key, 编译安装, 接着使用beast_encode_file()函数进行加密, 加密后的文件beast模块能自动识别.<br />
-使用案例: <a href="http://www.beastcoder.com">http://www.beastcoder.com</a><br />
-通过网址: <a href="http://www.beastcoder.com/info.php">http://www.beastcoder.com/info.php</a> 可以看到本扩展的信息.
+加密算法模块编写教程: <a href="https://github.com/liexusong/php-beast/write_a_encrypt_handler_module.md">click</a>
 </pre>
 
 
@@ -47,6 +45,7 @@ $ sudo make && make install
  beast.cache_size = size
  beast.log_file = "path_to_log"
  beast.enable = On
+ beast.encrypt_handler = "des-algo"
 </code></pre>
 
 通过测试环境:
