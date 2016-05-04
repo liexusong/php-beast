@@ -1,8 +1,7 @@
 加密模块编写教程
 ================
 <b>一，首先创建一个.c的文件。例如我们要编写一个使用base64加密的模块，可以创建一个名叫base64_algo_handler.c的文件。然后在文件添加如下代码：</b>
-<pre>
-<code lang="c">
+```c
 #include "beast_module.h"
 
 int base64_encrypt_handler(char *inbuf, int len, char **outbuf, int *outlen)
@@ -26,8 +25,7 @@ struct beast_ops base64_handler_ops = {
 	.decrypt = base64_decrypt_handler,
 	.free = base64_free_handler,
 };
-</code>
-</pre>
+```
 
 <b>模块必须实现3个方法，分别是：encrypt、decrypt、free方法。</b>
 
@@ -36,18 +34,19 @@ struct beast_ops base64_handler_ops = {
 + 3) free方法负责释放encrypt和decrypt方法生成的数据。
 
 <b>二，写好我们的加密模块后，需要在global_algo_modules.c添加我们模块的信息。代码如下：</b>
-<pre><code lang="c">
-#include &lt;stdlib.h&gt;
+```c
+#include <stdlib.h>
 #include "beast_module.h"
 
 extern struct beast_ops des_handler_ops;
+extern struct beast_ops base64_handler_ops;
 
 struct beast_ops *ops_handler_list[] = {
     &des_handler_ops,
     &base64_handler_ops, /* 这里是我们的模块信息 */
 	NULL,
 };
-</code></pre>
+```
 
 <b>三，修改config.m4文件，修改倒数第二行，如下代码：</b>
 <pre><code>
