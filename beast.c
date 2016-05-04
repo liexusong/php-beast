@@ -47,7 +47,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "php_beast.h"
 #include "cache.h"
 #include "beast_log.h"
-#include "ops_struct.h"
+#include "beast_module.h"
 
 
 #define BEAST_VERSION  "2.0"

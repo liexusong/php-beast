@@ -5,7 +5,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "ops_struct.h"
+#include "beast_module.h"
 #include "des_algo_lib.c"
 
 
@@ -102,5 +102,5 @@ struct beast_ops des_handler_ops = {
 	.name = "des-algo",
 	.encrypt = des_encrypt_handler,
 	.decrypt = des_decrypt_handler,
-	.free = des_free_handler
+	.free = des_free_handler,
 };

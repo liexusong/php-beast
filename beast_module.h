@@ -1,5 +1,5 @@
-#ifndef __ALGO_OPS_STRUCT_H
-#define __ALGO_OPS_STRUCT_H
+#ifndef __BEAST_MODULE_H
+#define __BEAST_MODULE_H
 
 typedef int beast_encrypt_op_t(char *inbuf, int inlen,
     char **outbuf, int *outlen);
