@@ -73,7 +73,6 @@ static int cache_hits = 0;
 static int cache_miss = 0;
 static int beast_enable = 1;
 static char *default_ops_name = NULL;
-static struct beast_ops *default_ops = NULL;
 static int beast_max_filesize = 0;
 
 /* {{{ beast_functions[]
@@ -150,8 +149,10 @@ int beast_register_ops(struct beast_ops *ops)
 }
 
 
-struct beast_ops *beast_get_default_ops(char *name)
+struct beast_ops *beast_get_default_ops()
 {
+    static struct beast_ops *default_ops = NULL;
+
     if (default_ops) {
         return default_ops;
     }
@@ -159,13 +160,13 @@ struct beast_ops *beast_get_default_ops(char *name)
     default_ops = ops_head;
 
     while (default_ops) {
-        if (!strcasecmp(default_ops->name, name)) {
+        if (!strcasecmp(default_ops->name, default_ops_name)) {
             return default_ops;
         }
         default_ops = default_ops->next;
     }
 
-    /* Not found set first handler */
+    /* not found and set first handler */
     default_ops = ops_head;
 
     return default_ops;
@@ -244,7 +245,7 @@ int encrypt_file(const char *inputfile, const char *outputfile TSRMLS_DC)
     int need_free_code = 0;
     char *inbuf, *outbuf;
     int inlen, outlen;
-    struct beast_ops *ops = beast_get_default_ops(default_ops_name);
+    struct beast_ops *ops = beast_get_default_ops();
 
     /* Get php codes from script file */
     if (filter_code_comments((char *)inputfile, &codes) == -1) {
@@ -325,7 +326,7 @@ int decrypt_file(int stream, char **retbuf,
     int headerlen;
     char *buffer = NULL, *decbuf;
     int declen;
-    struct beast_ops *ops = beast_get_default_ops(default_ops_name);
+    struct beast_ops *ops = beast_get_default_ops();
 
     *free_buffer = 0; /* set free buffer flag to false */
 
@@ -462,7 +463,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 
 final:
     if (free_buffer) {
-        ops = beast_get_default_ops(default_ops_name);
+        ops = beast_get_default_ops();
         if (ops && ops->free) {
             ops->free(buffer);
         }
