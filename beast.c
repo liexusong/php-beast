@@ -634,7 +634,7 @@ void segmentfault_deadlock_fix(int sig)
     beast_write_log(beast_log_error,
                     "Segment fault and fix deadlock");
     beast_mm_unlock();     /* Maybe lock mm so free here */
-    baest_cache_unlock();  /* Maybe lock cache so free here */
+    beast_cache_unlock();  /* Maybe lock cache so free here */
     exit(sig);
 }
 

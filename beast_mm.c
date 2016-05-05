@@ -48,7 +48,7 @@ static beast_atomic_t *mm_lock;
 static int mm_pid = -1;
 
 
-inline void beast_mm_lock()
+void beast_mm_lock()
 {
     if (mm_pid == -1) {
         mm_pid = (int)getpid();
@@ -57,7 +57,7 @@ inline void beast_mm_lock()
 }
 
 
-inline void beast_mm_unlock()
+void beast_mm_unlock()
 {
     if (mm_pid == -1) {
         mm_pid = (int)getpid();

@@ -25,7 +25,7 @@ cache_item_t *beast_cache_create(cache_key_t *key);
 cache_item_t *beast_cache_push(cache_item_t *item);
 int beast_cache_destroy();
 
-inline void beast_cache_lock();
-inline void baest_cache_unlock();
+void beast_cache_lock();
+void beast_cache_unlock();
 
 #endif

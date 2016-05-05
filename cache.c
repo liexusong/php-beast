@@ -36,7 +36,7 @@ static beast_atomic_t *cache_lock;
 static int cache_pid = -1;
 
 
-inline void beast_cache_lock()
+void beast_cache_lock()
 {
     if (cache_pid == -1) {
         cache_pid = (int)getpid();
@@ -45,7 +45,7 @@ inline void beast_cache_lock()
 }
 
 
-inline void baest_cache_unlock()
+void beast_cache_unlock()
 {
     if (cache_pid == -1) {
         cache_pid = (int)getpid();
