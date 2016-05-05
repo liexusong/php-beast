@@ -20,8 +20,8 @@
 
 #define BEAST_SEGMENT_DEFAULT_SIZE (256 * 1024)
 
-#define _BLOCKAT(offset)   ((beast_block_t *)((char *)shmaddr + (offset)))
-#define _OFFSET(block)     ((int)(((char *)(block)) - (char *)shmaddr))
+#define _BLOCKAT(offset)  ((beast_block_t *)((char *)shmaddr + (offset)))
+#define _OFFSET(block)    ((int)(((char *)(block)) - (char *)shmaddr))
 
 #ifdef max
 #undef max
@@ -45,6 +45,25 @@ static int beast_mm_initialized = 0;
 static void *beast_mm_block = NULL;
 static int beast_mm_block_size = 0;
 static beast_atomic_t *mm_lock;
+static int mm_pid = -1;
+
+
+inline void beast_mm_lock()
+{
+    if (mm_pid == -1) {
+        mm_pid = (int)getpid();
+    }
+    beast_spinlock(mm_lock, mm_pid);
+}
+
+
+inline void beast_mm_unlock()
+{
+    if (mm_pid == -1) {
+        mm_pid = (int)getpid();
+    }
+    beast_spinunlock(mm_lock, mm_pid);
+}
 
 
 /*
@@ -60,7 +79,7 @@ static inline int beast_mm_alignmem(int bits)
         double d;
         void (*f)();
     } beast_word_t; /* may be 8 bits */
-    
+
     return sizeof(beast_word_t) * (1 + ((bits - 1) / sizeof(beast_word_t)));
 }
 
@@ -74,8 +93,8 @@ static int beast_mm_allocate(void *shmaddr, int size)
     int minsize;                  /* for finding best fit */
 
     /* Realsize must be aligned to a word boundary on some architectures. */
-    realsize = beast_mm_alignmem(max(size + beast_mm_alignmem(sizeof(int)),
-                   sizeof(beast_block_t)));
+    realsize = beast_mm_alignmem(
+             max(size + beast_mm_alignmem(sizeof(int)), sizeof(beast_block_t)));
 
     /*
      * First, insure that the segment contains at least realsize free bytes,
@@ -84,7 +103,7 @@ static int beast_mm_allocate(void *shmaddr, int size)
     header = (beast_header_t *)shmaddr;
     if (header->avail < realsize) {
         beast_write_log(beast_log_error,
-                 "Not enough memory for beast_mm_alloc()");
+                        "Not enough memory for beast_mm_alloc()");
         return -1;
     }
 
@@ -159,7 +178,7 @@ static int beast_mm_deallocate(void *shmaddr, int offset)
     cur = _BLOCKAT(offset);
     cur->next = prv->next;
     prv->next = offset;
-    
+
     /* update the block header */
     header = (beast_header_t *)shmaddr;
     header->avail += cur->size;
@@ -197,11 +216,15 @@ int beast_mm_init(int block_size)
     }
 
     /* init memory manager lock */
-    mm_lock = (int *)mmap(NULL, sizeof(int), PROT_READ|PROT_WRITE,
-                                             MAP_SHARED|MAP_ANON, -1, 0);
+    mm_lock = (int *)mmap(NULL,
+                          sizeof(int),
+                          PROT_READ|PROT_WRITE,
+                          MAP_SHARED|MAP_ANON,
+                          -1,
+                          0);
     if (!mm_lock) {
         beast_write_log(beast_log_error,
-              "Unable alloc share memory for memory manager lock");
+                        "Unable alloc share memory for memory manager lock");
         return -1;
     }
     *mm_lock = 0;
@@ -213,10 +236,15 @@ int beast_mm_init(int block_size)
         beast_mm_block_size = block_size;
     }
 
-    shmaddr = beast_mm_block = (void *)mmap(NULL, beast_mm_block_size,
-                              PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANON, -1, 0);
+    shmaddr = beast_mm_block = (void *)mmap(NULL,
+                                            beast_mm_block_size,
+                                            PROT_READ|PROT_WRITE,
+                                            MAP_SHARED|MAP_ANON,
+                                            -1,
+                                            0);
     if (!beast_mm_block) {
-        beast_write_log(beast_log_error, "Unable alloc share memory for beast");
+        beast_write_log(beast_log_error,
+                        "Unable alloc share memory for beast");
         munmap(mm_lock, sizeof(int));
         return -1;
     }
@@ -224,8 +252,10 @@ int beast_mm_init(int block_size)
     header = (beast_header_t *)beast_mm_block;
     header->segsize = beast_mm_block_size;
     /* avail size */
-    header->avail = beast_mm_block_size - sizeof(beast_header_t) - 
-                      sizeof(beast_block_t) - beast_mm_alignmem(sizeof(int));
+    header->avail = beast_mm_block_size
+                   - sizeof(beast_header_t)
+                   - sizeof(beast_block_t)
+                   - beast_mm_alignmem(sizeof(int));
 
     /* the free list head block node */
     block = _BLOCKAT(sizeof(beast_header_t));
@@ -238,7 +268,7 @@ int beast_mm_init(int block_size)
     block->next = 0;
 
     beast_mm_initialized = 1;
-    
+
     return 0;
 }
 
@@ -247,16 +277,15 @@ void *beast_mm_malloc(int size)
 {
     int offset;
     void *p = NULL;
-    int pid = (int)getpid();
 
-    beast_spinlock(mm_lock, pid);
+    beast_mm_lock();
 
     offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
     }
-    
-    beast_spinunlock(mm_lock, pid);
+
+    beast_mm_unlock();
 
     return p;
 }
@@ -266,16 +295,15 @@ void *beast_mm_calloc(int size)
 {
     int offset;
     void *p = NULL;
-    int pid = (int)getpid();
 
-    beast_spinlock(mm_lock, pid);
+    beast_mm_lock();
 
     offset = beast_mm_allocate(beast_mm_block, size);
     if (offset != -1) {
         p = (void *)(((char *)beast_mm_block) + offset);
     }
 
-    beast_spinunlock(mm_lock, pid);
+    beast_mm_unlock();
 
     if (NULL != p) {
         memset(p, 0, size);
@@ -288,18 +316,15 @@ void *beast_mm_calloc(int size)
 void beast_mm_free(void *p)
 {
     int offset;
-    int pid = (int)getpid();
 
     offset = (unsigned int)((char *)p - (char *)beast_mm_block);
     if (offset <= 0) {
         return;
     }
 
-    beast_spinlock(mm_lock, pid);
-
+    beast_mm_lock();
     beast_mm_deallocate(beast_mm_block, offset);
-
-    beast_spinunlock(mm_lock, pid);
+    beast_mm_unlock();
 }
 
 
@@ -308,14 +333,15 @@ void beast_mm_flush()
     beast_header_t *header;
     beast_block_t *block;
     void *shmaddr;
-    int pid = (int)getpid();
 
-    beast_spinlock(mm_lock, pid);
+    beast_mm_lock();
 
     shmaddr = beast_mm_block;
     header = (beast_header_t *)shmaddr;
-    header->avail = beast_mm_block_size - sizeof(beast_header_t) - 
-                      sizeof(beast_block_t) - beast_mm_alignmem(sizeof(int));
+    header->avail = beast_mm_block_size
+                   - sizeof(beast_header_t)
+                   - sizeof(beast_block_t)
+                   - beast_mm_alignmem(sizeof(int));
 
     /* the free list head block node */
     block = _BLOCKAT(sizeof(beast_header_t));
@@ -327,7 +353,7 @@ void beast_mm_flush()
     block->size = header->avail;
     block->next = 0;
 
-    beast_spinunlock(mm_lock, pid);
+    beast_mm_unlock();
 }
 
 
@@ -338,13 +364,10 @@ int beast_mm_availspace()
 {
     int size;
     beast_header_t *header = (beast_header_t *)beast_mm_block;
-    int pid = (int)getpid();
 
-    beast_spinlock(mm_lock, pid);
-
+    beast_mm_lock();
     size = header->avail;
-
-    beast_spinunlock(mm_lock, pid);
+    beast_mm_unlock();
 
     return size;
 }

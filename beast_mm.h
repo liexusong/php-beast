@@ -10,4 +10,7 @@ int beast_mm_availspace();
 int beast_mm_realspace();
 void beast_mm_destroy();
 
+inline void beast_mm_lock();
+inline void beast_mm_unlock();
+
 #endif

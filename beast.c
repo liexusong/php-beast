@@ -45,6 +45,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "ext/standard/info.h"
 #include "php_streams.h"
 #include "php_beast.h"
+#include "beast_mm.h"
 #include "cache.h"
 #include "beast_log.h"
 #include "beast_module.h"
@@ -464,7 +465,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 final:
     if (free_buffer) {
         ops = beast_get_default_ops();
-        if (ops && ops->free) {
+        if (ops->free) {
             ops->free(buffer);
         }
     }
@@ -626,6 +627,17 @@ int set_nonblock(int fd)
     return 0;
 }
 
+
+void segmentfault_deadlock_fix(int sig)
+{
+    beast_write_log(beast_log_error,
+                    "Segment fault and fix deadlock");
+    beast_mm_unlock();     /* Maybe lock mm so free here */
+    baest_cache_unlock();  /* Maybe lock cache so free here */
+    exit(sig);
+}
+
+
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(beast)
@@ -683,6 +695,8 @@ PHP_MINIT_FUNCTION(beast)
                          E_ERROR, "Havn't active encrypt algorithms in system");
         return FAILURE;
     }
+
+    signal(SIGSEGV, segmentfault_deadlock_fix);
 
     return SUCCESS;
 }
