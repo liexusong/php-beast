@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
