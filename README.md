@@ -42,6 +42,13 @@ $ sudo make && make install
  beast.encrypt_handler = "des-algo"
 </code></pre>
 
+支持的模块有：
+<pre>
+ 1. AES
+ 2. DES
+ 3. Base64
+</pre>
+
 通过测试环境:
 <pre><code>
  Nginx + Fastcgi + (PHP-5.2.x ~ PHP-5.6.x)
