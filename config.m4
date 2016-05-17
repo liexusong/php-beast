@@ -59,5 +59,5 @@ if test "$PHP_BEAST" != "no"; then
   dnl
   dnl PHP_SUBST(BEAST_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(beast, beast.c des_algo_handler.c beast_mm.c spinlock.c cache.c beast_log.c global_algo_modules.c, $ext_shared)
+  PHP_NEW_EXTENSION(beast, beast.c des_algo_handler.c base64_algo_handler.c beast_mm.c spinlock.c cache.c beast_log.c global_algo_modules.c, $ext_shared)
 fi
