@@ -52,7 +52,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_module.h"
 
 
-#define BEAST_VERSION  "2.0"
+#define BEAST_VERSION  "2.1"
 #define DEFAULT_CACHE_SIZE  1048576
 
 
