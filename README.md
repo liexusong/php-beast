@@ -8,11 +8,11 @@
 </code></pre>
 
 <p>
-<b>此模块可以用于商业, 可自定义加密算法, 版权归原作者.</b><br/>
+<b>此模块可以用于商业用途, 版权归原作者.</b><br/>
 <b>QQ交流群：239243332</b>
 </p>
 
-<b>加密算法模块编写教程: <a href="https://github.com/liexusong/php-beast/wiki/%E5%8A%A0%E5%AF%86%E6%A8%A1%E5%9D%97%E7%BC%96%E5%86%99%E6%95%99%E7%A8%8B">点击</a></b>
+<b>php-beast可以自定义加密模块，加密模块编写教程: <a href="https://github.com/liexusong/php-beast/wiki/%E5%8A%A0%E5%AF%86%E6%A8%A1%E5%9D%97%E7%BC%96%E5%86%99%E6%95%99%E7%A8%8B">点击</a></b>
 
 <h3>编译安装如下:</h3>
 <pre><code>
@@ -58,9 +58,8 @@ $ sudo make && make install
 如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
 
 ------------------------------
-作者: 列旭松(280259971@qq.com) 专业定制PHP扩展、Nginx模块。
+作者: liexusong(280259971@qq.com)。
 
-我的著作: http://book.jd.com/11123177.html<br/>
-<b>提供安装配置服务和定制版本, 请联系QQ: 280259971</b><br/>
+<b>my book:</b> http://book.jd.com/11123177.html<br/>
 捐赠本项目: <img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" />
 ------------------------------
