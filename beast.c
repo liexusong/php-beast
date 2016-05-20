@@ -52,8 +52,9 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_module.h"
 
 
-#define BEAST_VERSION  "2.1"
+#define BEAST_VERSION       "2.1"
 #define DEFAULT_CACHE_SIZE  1048576
+#define HEADER_MAX_SIZE     256
 
 
 extern struct beast_ops *ops_handler_list[];
@@ -115,10 +116,8 @@ ZEND_GET_MODULE(beast)
 #endif
 
 
-#define CHR1  0xe8
-#define CHR2  0x16
-#define CHR3  0xa4
-#define CHR4  0x0c
+extern char encrypt_file_header_sign[];
+extern int encrypt_file_header_length;
 
 #define swab32(x)                                        \
      ((x & 0x000000FF) << 24 | (x & 0x0000FF00) << 8 |   \
@@ -242,11 +241,10 @@ int filter_code_comments(char *filename, zval *retval)
 int encrypt_file(const char *inputfile, const char *outputfile TSRMLS_DC)
 {
     php_stream *output_stream = NULL;
-    char header[8];
     zval codes;
     int need_free_code = 0;
     char *inbuf, *outbuf;
-    int inlen, outlen;
+    int inlen, outlen, dumplen;
     struct beast_ops *ops = beast_get_default_ops();
 
     /* Get php codes from script file */
@@ -275,19 +273,16 @@ int encrypt_file(const char *inputfile, const char *outputfile TSRMLS_DC)
         goto failed;
     }
 
-    header[0] = CHR1;
-    header[1] = CHR2;
-    header[2] = CHR3;
-    header[3] = CHR4;
-
     /* if computer is little endian, change file size to big endian */
     if (little_endian()) {
-        *((int *)&header[4]) = swab32(inlen);
+        dumplen = swab32(inlen);
     } else {
-        *((int *)&header[4]) = inlen;
+        dumplen = inlen;
     }
 
-    php_stream_write(output_stream, header, 8 * sizeof(char));
+    php_stream_write(output_stream,
+        encrypt_file_header_sign, encrypt_file_header_length);
+    php_stream_write(output_stream, &dumplen, sizeof(dumplen));
 
     if (ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
@@ -324,7 +319,7 @@ int decrypt_file(int stream, char **retbuf,
     cache_key_t findkey;
     cache_item_t *cache;
     int reallen, bodylen;
-    char header[8];
+    char header[HEADER_MAX_SIZE];
     int headerlen;
     char *buffer = NULL, *decbuf;
     int declen;
@@ -351,18 +346,16 @@ int decrypt_file(int stream, char **retbuf,
 
     /* not found cache and decrypt file */
 
-    headerlen = 8 * sizeof(char);
+    headerlen = encrypt_file_header_length + sizeof(int);
 
     if (read(stream, header, headerlen) != headerlen
-        || (header[0] & 0xFF) != CHR1
-        || (header[1] & 0xFF) != CHR2
-        || (header[2] & 0xFF) != CHR3
-        || (header[3] & 0xFF) != CHR4)
+        || memcmp(header, encrypt_file_header_sign, encrypt_file_header_length))
     {
         goto failed;
     }
 
-    reallen = *((int *)&header[4]); /* real php script file's size */
+    /* real php script file's size */
+    reallen = *((int *)&header[encrypt_file_header_length]);
 
     if (little_endian()) {
         reallen = swab32(reallen);
@@ -651,6 +644,12 @@ PHP_MINIT_FUNCTION(beast)
 
     if (!beast_enable) {
         return SUCCESS;
+    }
+
+    if (encrypt_file_header_length + sizeof(int) > HEADER_MAX_SIZE) {
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+            "Header size overflow max size `%d'", HEADER_MAX_SIZE);
+        return FAILURE;
     }
 
     /* Check module support the max file size */
