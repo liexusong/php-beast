@@ -77,6 +77,7 @@ static int cache_miss = 0;
 static int beast_enable = 1;
 static char *default_ops_name = NULL;
 static int beast_max_filesize = 0;
+static char *local_networkcard = NULL;
 
 /* {{{ beast_functions[]
  *
@@ -595,6 +596,21 @@ ZEND_INI_MH(php_beast_encrypt_handler)
 }
 
 
+ZEND_INI_MH(php_beast_set_networkcard)
+{
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    local_networkcard = strdup(new_value);
+    if (local_networkcard == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+}
+
+
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL,
           php_beast_cache_size)
@@ -604,6 +620,8 @@ PHP_INI_BEGIN()
           php_beast_enable)
     PHP_INI_ENTRY("beast.encrypt_handler", "des-algo", PHP_INI_ALL,
           php_beast_encrypt_handler)
+    PHP_INI_ENTRY("beast.networkcard", "eth0", PHP_INI_ALL,
+          php_beast_set_networkcard)
 PHP_INI_END()
 
 /* }}} */
@@ -632,6 +650,58 @@ void segmentfault_deadlock_fix(int sig)
 }
 
 
+int validate_networkcard()
+{
+    extern char *allow_networkcards[];
+    char **ptr, *curr, *last;
+    int active = 0;
+    FILE *fp;
+    char cmd[128], buf[128];
+
+    for (ptr = allow_networkcards; *ptr; ptr++, active++);
+
+    if (!active) {
+        return 0;
+    }
+
+    memset(cmd, 0, 128);
+    memset(buf, 0, 128);
+
+    snprintf(cmd, 128, "cat /sys/class/net/%s/address", local_networkcard);
+
+    fp = popen(cmd, "r");
+    if (!fp) {
+        return 0;
+    }
+
+    fgets(buf, 128, fp);
+
+    for (curr = buf, last = NULL; *curr; curr++) {
+        if (*curr != '\n') {
+            last = curr;
+        }
+    }
+
+    if (!last) {
+        return -1;
+    }
+
+    for (last += 1; *last; last++) {
+        *last = '\0';
+    }
+
+    pclose(fp);
+
+    for (ptr = allow_networkcards; *ptr; ptr++) {
+        if (!strcmp(buf, *ptr)) {
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(beast)
@@ -646,9 +716,15 @@ PHP_MINIT_FUNCTION(beast)
         return SUCCESS;
     }
 
+    if (validate_networkcard() == -1) {
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                         "Not allowed run at this computer");
+        return FAILURE;
+    }
+
     if (encrypt_file_header_length + sizeof(int) > HEADER_MAX_SIZE) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-            "Header size overflow max size `%d'", HEADER_MAX_SIZE);
+                         "Header size overflow max size `%d'", HEADER_MAX_SIZE);
         return FAILURE;
     }
 
