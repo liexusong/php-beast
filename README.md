@@ -58,9 +58,17 @@ $ sudo make && make install
 如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
 
 ------------------------------
+
 作者: liexusong(280259971@qq.com)。
 
 <b>my book:《<a href="http://book.jd.com/11123177.html">PHP核心技术与最佳实践</a>》</b>此书有详细的PHP扩展编写教程<br/>
-捐赠本项目: <img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" />&nbsp;&nbsp;&nbsp;
-<img width="250" src="https://github.com/liexusong/php-beast/blob/master/images/pay.jpg?raw=true" />
+# 捐赠本项目:
+<p>
+支付宝：<br />
+<img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" /></p>
+<p>
+微信：<br />
+<img width="250" src="http://git.oschina.net/liexusong/php-beast/raw/master/images/pay.jpg?dir=0&filepath=images%2Fpay.jpg&oid=324fa98d10ed5db5a1ac5e765ce12db5d65cebd5&sha=20e9e714be2695829883a4055815a94d753545ec" />
+</p>
+
 ------------------------------
