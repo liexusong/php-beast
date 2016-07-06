@@ -59,6 +59,25 @@ $ sudo make && make install
 
 ------------------------------
 
+## 制定自己的php-beast
+
+`php-beast` 有多个地方可以定制的，以下一一列出：
+
+*1.* 使用 `header.c` 文件可以修改 `php-beast` 加密后的文件头结构，这样网上的解密软件就不能认识我们的加密文件，就不能进行解密，增加加密的安全性。
+
+*2.* `php-beast` 提供只能在指定的机器上运行的功能。要使用此功能可以在 `networkcards.c` 文件添加能够运行机器的网卡号，例如：
+```c
+char *allow_networkcards[] = {
+	"fa:16:3e:08:88:01",
+    NULL,
+};
+```
+这样设置之后，`php-beast` 扩展就只能在 `fa:16:3e:08:88:01` 这台机器上运行。另外要注意的是，由于有些机器网卡名可能不一样，所以如果你的网卡名不是 `eth0` 的话，可以在 `php.ini` 中添加配置项： `beast.networkcard = "xxx"` 其中 `xxx` 就是你的网卡名。
+
+*3.* 使用 `php-beast` 时最好不要使用默认的加密key，因为扩展是开源的，如果使用默认加密key的话，很容易被人发现。所以最好编译的时候修改加密的key，`aes模块` 可以在 `aes_algo_handler.c` 文件修改，而 `des模块` 可以在 `des_algo_handler.c` 文件修改。
+
+------------------------------
+
 作者: liexusong(280259971@qq.com)。
 
 <b>my book:《<a href="http://book.jd.com/11123177.html">PHP核心技术与最佳实践</a>》</b>此书有详细的PHP扩展编写教程<br/>
