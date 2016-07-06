@@ -91,19 +91,21 @@ function encrypt_directory($dir, $new_dir)
     closedir($handle);
 }
 
+//////////////////////////////// run here ////////////////////////////////////
 
-if (count($argv) < 3) {
-    exit("Usage: php encode_files.php <source path> <destination path>\n\n");
+$conf = parse_ini_file(dirname(__FILE__) . '/configure.ini');
+if (!$conf) {
+    exit("Fatal: failed to read configure.ini file\n");
 }
 
-$src_path = $argv[1];
-$dst_path = $argv[2];
+$src_path = trim($conf['src_path']);
+$dst_path = trim($conf['dst_path']);
 
-if (!is_dir($src_path)) {
+if (empty($src_path) || !is_dir($src_path)) {
     exit("Fatal: source path `{$src_path}' not exists\n\n");
 }
 
-if (!is_dir($dst_path) && !mkdir($dst_path, 0777)) {
+if (empty($dst_path) || (!is_dir($dst_path) && !mkdir($dst_path, 0777))) {
     exit("Fatal: can not create directory `{$dst_path}'\n\n");
 }
 
