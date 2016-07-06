@@ -5,15 +5,14 @@
  * @author: xusong.lie
  */
 
-$files = 0;
+$nfiles = 0;
 $finish = 0;
 
 function calculate_directory_schedule($dir)
 {
-    global $files;
+    global $nfiles;
 
     $dir = rtrim($dir, '/');
-    $new_dir = rtrim($new_dir, '/');
 
     $handle = opendir($dir);
     if (!$handle) {
@@ -26,7 +25,6 @@ function calculate_directory_schedule($dir)
         }
 
         $path = $dir . '/' . $file;
-        $new_path =  $new_dir . '/' . $file;
 
         if (is_dir($path)) {
             calculate_directory_schedule($path);
@@ -35,7 +33,7 @@ function calculate_directory_schedule($dir)
             $infos = explode('.', $file);
 
             if (strtolower($infos[count($infos)-1]) == 'php') {
-                $files++;
+                $nfiles++;
             }
         }
     }
@@ -45,7 +43,7 @@ function calculate_directory_schedule($dir)
 
 function encrypt_directory($dir, $new_dir)
 {
-    global $files, $finish;
+    global $nfiles, $finish;
 
     $dir = rtrim($dir, '/');
     $new_dir = rtrim($new_dir, '/');
@@ -80,7 +78,9 @@ function encrypt_directory($dir, $new_dir)
 
                 $finish++;
 
-                printf("\rProcessed files [%d%%] - 100%%", intval($finish / $files));
+                $percent = intval($finish / $nfiles * 100);
+
+                printf("\rProcessed files [%d%%] - 100%%", $percent);
 
             } else {
                 copy($path, $new_path);
@@ -93,26 +93,25 @@ function encrypt_directory($dir, $new_dir)
 
 
 if (count($argv) < 3) {
-    exit("Usage: encode_files.php <old_path> <new_path>\n\n");
+    exit("Usage: php encode_files.php <source path> <destination path>\n\n");
 }
 
-$old_path = $argv[1];
-$new_path = $argv[2];
+$src_path = $argv[1];
+$dst_path = $argv[2];
 
-if (!is_dir($old_path)) {
-    exit("Fatal: path `{$old_path}' not exists\n\n");
+if (!is_dir($src_path)) {
+    exit("Fatal: source path `{$src_path}' not exists\n\n");
 }
 
-if (!is_dir($new_path) && !mkdir($new_path, 0777)) {
-    exit("Fatal: can not create directory `{$newpath}'\n\n");
+if (!is_dir($dst_path) && !mkdir($dst_path, 0777)) {
+    exit("Fatal: can not create directory `{$dst_path}'\n\n");
 }
 
-$time = time();
+$time = microtime(TRUE);
 
-calculate_directory_schedule($old_path);
-encrypt_directory($old_path, $new_path);
+calculate_directory_schedule($src_path);
+encrypt_directory($src_path, $dst_path);
 
-$used = time() - $time;
+$used = microtime(TRUE) - $time;
 
-printf("\nFinish processed files, used %d seconds\n", $used);
-
+printf("\nFinish processed files, used %f seconds\n", $used);
