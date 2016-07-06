@@ -2,11 +2,16 @@
 
 /**
  * Encode files by directory
- * @author: Howard.Lee
+ * @author: xusong.lie
  */
 
-function encode_files($dir, $new_dir)
+$files = 0;
+$finish = 0;
+
+function calculate_directory_schedule($dir)
 {
+    global $files;
+
     $dir = rtrim($dir, '/');
     $new_dir = rtrim($new_dir, '/');
 
@@ -19,7 +24,42 @@ function encode_files($dir, $new_dir)
         if ($file == '.' || $file == '..') {
             continue;
         }
-        
+
+        $path = $dir . '/' . $file;
+        $new_path =  $new_dir . '/' . $file;
+
+        if (is_dir($path)) {
+            calculate_directory_schedule($path);
+
+        } else {
+            $infos = explode('.', $file);
+
+            if (strtolower($infos[count($infos)-1]) == 'php') {
+                $files++;
+            }
+        }
+    }
+
+    closedir($handle);
+}
+
+function encrypt_directory($dir, $new_dir)
+{
+    global $files, $finish;
+
+    $dir = rtrim($dir, '/');
+    $new_dir = rtrim($new_dir, '/');
+
+    $handle = opendir($dir);
+    if (!$handle) {
+        return false;
+    }
+
+    while (($file = readdir($handle))) {
+        if ($file == '.' || $file == '..') {
+            continue;
+        }
+
         $path = $dir . '/' . $file;
         $new_path =  $new_dir . '/' . $file;
 
@@ -27,7 +67,9 @@ function encode_files($dir, $new_dir)
             if (!is_dir($new_path)) {
                 mkdir($new_path, 0777);
             }
-            encode_files($path, $new_path);
+
+            encrypt_directory($path, $new_path);
+
         } else {
             $infos = explode('.', $file);
 
@@ -35,11 +77,18 @@ function encode_files($dir, $new_dir)
                 if (!beast_encode_file($path, $new_path)) {
                     echo "Failed to encode file `{$path}'\n";
                 }
+
+                $finish++;
+
+                printf("\rProcessed files [%d%%] - 100%%", intval($finish / $files));
+
             } else {
                 copy($path, $new_path);
             }
         }
     }
+
+    closedir($handle);
 }
 
 
@@ -58,5 +107,12 @@ if (!is_dir($new_path) && !mkdir($new_path, 0777)) {
     exit("Fatal: can not create directory `{$newpath}'\n\n");
 }
 
-encode_files($old_path, $new_path);
+$time = time();
+
+calculate_directory_schedule($old_path);
+encrypt_directory($old_path, $new_path);
+
+$used = time() - $time;
+
+printf("\nFinish processed files, used %d seconds\n", $used);
 
