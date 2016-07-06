@@ -80,7 +80,7 @@ function encrypt_directory($dir, $new_dir)
 
                 $percent = intval($finish / $nfiles * 100);
 
-                printf("\rProcessed files [%d%%] - 100%%", $percent);
+                printf("\rProcessed encrypt files [%d%%] - 100%%", $percent);
 
             } else {
                 copy($path, $new_path);
@@ -114,4 +114,4 @@ encrypt_directory($src_path, $dst_path);
 
 $used = microtime(TRUE) - $time;
 
-printf("\nFinish processed files, used %f seconds\n", $used);
+printf("\nFinish processed encrypt files, used %f seconds\n", $used);
