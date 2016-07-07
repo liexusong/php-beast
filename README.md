@@ -8,6 +8,7 @@
 </code></pre>
 
 <pre>
+商业版本可以查看：<a href="https://item.taobao.com/item.htm?id=535373641528">淘宝链接</a><br/>
 此模块可以用于商业用途, 版权归原作者.<br/>
 QQ交流群：239243332
 </pre>
