@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <time.h>
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
@@ -44,6 +45,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "php_ini.h"
 #include "main/SAPI.h"
 #include "ext/standard/info.h"
+#include "ext/date/php_date.h"
 #include "php_streams.h"
 #include "php_beast.h"
 #include "beast_mm.h"
@@ -52,9 +54,10 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_module.h"
 
 
-#define BEAST_VERSION       "2.1"
-#define DEFAULT_CACHE_SIZE  1048576
+#define BEAST_VERSION       "2.2"
+#define DEFAULT_CACHE_SIZE  10485760   /* 10MB */
 #define HEADER_MAX_SIZE     256
+#define INT_SIZE            (sizeof(int))
 
 
 extern struct beast_ops *ops_handler_list[];
@@ -78,6 +81,7 @@ static int beast_enable = 1;
 static char *default_ops_name = NULL;
 static int beast_max_filesize = 0;
 static char *local_networkcard = NULL;
+static int beast_now_time = 0;
 
 /* {{{ beast_functions[]
  *
@@ -239,13 +243,14 @@ int filter_code_comments(char *filename, zval *retval)
 *                                                                            *
 *****************************************************************************/
 
-int encrypt_file(const char *inputfile, const char *outputfile TSRMLS_DC)
+int encrypt_file(const char *inputfile,
+    const char *outputfile, int expire TSRMLS_DC)
 {
     php_stream *output_stream = NULL;
     zval codes;
     int need_free_code = 0;
     char *inbuf, *outbuf;
-    int inlen, outlen, dumplen;
+    int inlen, outlen, dumplen, expireval;
     struct beast_ops *ops = beast_get_default_ops();
 
     /* Get php codes from script file */
@@ -276,14 +281,17 @@ int encrypt_file(const char *inputfile, const char *outputfile TSRMLS_DC)
 
     /* if computer is little endian, change file size to big endian */
     if (little_endian()) {
-        dumplen = swab32(inlen);
+        dumplen   = swab32(inlen);
+        expireval = swab32(expire);
     } else {
-        dumplen = inlen;
+        dumplen   = inlen;
+        expireval = expire;
     }
 
     php_stream_write(output_stream,
         encrypt_file_header_sign, encrypt_file_header_length);
-    php_stream_write(output_stream, &dumplen, sizeof(dumplen));
+    php_stream_write(output_stream, &dumplen, INT_SIZE);
+    php_stream_write(output_stream, &expireval, INT_SIZE);
 
     if (ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
@@ -319,16 +327,18 @@ int decrypt_file(int stream, char **retbuf,
     struct stat stat_ssb;
     cache_key_t findkey;
     cache_item_t *cache;
-    int reallen, bodylen;
+    int reallen, bodylen, expire;
     char header[HEADER_MAX_SIZE];
     int headerlen;
     char *buffer = NULL, *decbuf;
     int declen;
     struct beast_ops *ops = beast_get_default_ops();
+    int retval = -1;
 
     *free_buffer = 0; /* set free buffer flag to false */
 
     if (fstat(stream, &stat_ssb) == -1) {
+        retval = -1;
         goto failed;
     }
 
@@ -347,19 +357,31 @@ int decrypt_file(int stream, char **retbuf,
 
     /* not found cache and decrypt file */
 
-    headerlen = encrypt_file_header_length + sizeof(int);
+    /*
+     * 1 INT_SIZE is dump length,
+     * 1 INT_SIZE is expire time.
+     */
+    headerlen = encrypt_file_header_length + INT_SIZE * 2);
 
     if (read(stream, header, headerlen) != headerlen
         || memcmp(header, encrypt_file_header_sign, encrypt_file_header_length))
     {
+        retval = -1;
         goto failed;
     }
 
     /* real php script file's size */
     reallen = *((int *)&header[encrypt_file_header_length]);
+    expire = *((int *)&header[encrypt_file_header_length + INT_SIZE]);
 
     if (little_endian()) {
         reallen = swab32(reallen);
+        expire = swab32(expire);
+    }
+
+    if (expire > 0 && expire < beast_now_time) {
+        retval = -2;
+        goto failed;
     }
 
     /**
@@ -374,6 +396,7 @@ int decrypt_file(int stream, char **retbuf,
         || read(stream, buffer, bodylen) != bodylen
         || ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1)
     {
+        retval = -1;
         goto failed;
     }
 
@@ -410,7 +433,7 @@ failed:
         free(buffer);
     }
 
-    return -1;
+    return retval;
 }
 
 
@@ -436,7 +459,13 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
      }
 
     retval = decrypt_file(fd, &buffer, &size, &free_buffer TSRMLS_CC);
-    if (retval != 0 || pipe(shadow) != 0) {
+    if (retval == -2) {
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                     "This program was expired, please contact administrator");
+        return NULL;
+    }
+
+    if (retval == -1 || pipe(shadow) != 0) {
         goto final;
     }
 
@@ -612,7 +641,7 @@ ZEND_INI_MH(php_beast_set_networkcard)
 
 
 PHP_INI_BEGIN()
-    PHP_INI_ENTRY("beast.cache_size", "1048576", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.cache_size", "10485760", PHP_INI_ALL,
           php_beast_cache_size)
     PHP_INI_ENTRY("beast.log_file", "/tmp/beast.log", PHP_INI_ALL,
           php_beast_log_file)
@@ -722,7 +751,7 @@ PHP_MINIT_FUNCTION(beast)
         return FAILURE;
     }
 
-    if (encrypt_file_header_length + sizeof(int) > HEADER_MAX_SIZE) {
+    if ((encrypt_file_header_length + INT_SIZE * 2) > HEADER_MAX_SIZE) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                          "Header size overflow max size `%d'", HEADER_MAX_SIZE);
         return FAILURE;
@@ -802,6 +831,7 @@ PHP_MSHUTDOWN_FUNCTION(beast)
  */
 PHP_RINIT_FUNCTION(beast)
 {
+    beast_now_time = time(NULL); /* Update now time */
     return SUCCESS;
 }
 /* }}} */
@@ -835,10 +865,14 @@ PHP_FUNCTION(beast_encode_file)
     char *input, *output;
     char *itmp, *otmp;
     int input_len, output_len;
+    char *expire_datetime = NULL;
+    int expire_datetime_len = 0;
+    signed long expire = 0;
     int retval;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss", &input,
-            &input_len, &output, &output_len TSRMLS_CC) == FAILURE)
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|s",
+            &input, &input_len, &output, &output_len, &expire_datetime,
+            &expire_datetime_len TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
@@ -857,7 +891,15 @@ PHP_FUNCTION(beast_encode_file)
     memcpy(otmp, output, output_len);
     otmp[output_len] = 0;
 
-    retval = encrypt_file(itmp, otmp TSRMLS_CC);
+    if (expire_datetime) {
+        int now;
+        expire = php_parse_date(expire_datetime, &now);
+        if (expire < 0) {
+            expire = 0;
+        }
+    }
+
+    retval = encrypt_file(itmp, otmp, expire TSRMLS_CC);
 
     free(itmp);
     free(otmp);
@@ -904,3 +946,4 @@ PHP_FUNCTION(beast_support_filesize)
  * vim600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
+

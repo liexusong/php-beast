@@ -8,7 +8,6 @@
 </code></pre>
 
 <pre>
-商业版本可以查看：<a href="https://item.taobao.com/item.htm?id=535373641528">淘宝链接</a><br/>
 此模块可以用于商业用途, 版权归原作者.<br/>
 QQ交流群：239243332
 </pre>
@@ -57,6 +56,23 @@ $ sudo make && make install
 
 <h3>注意</h3>
 如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
+
+------------------------------
+
+## 怎么加密项目
+安装完 `php-beast` 后可以使用 `tools` 目录下的 `encode_files.php` 来加密你的项目。使用 `encode_files.php` 之前先修改 `tools` 目录下的 `configure.ini` 文件，如下：
+```ini
+; source path
+src_path = ""
+
+; destination path
+dst_path = ""
+
+; expire time
+expire = ""
+```
+`src_path` 是要加密项目的路径，`dst_path` 是保存加密后项目的路径，`expire` 是设置项目可使用的时间 (`expire` 的格式是：`YYYY-mm-dd HH:ii:ss`)。
+修改完 `configure.ini` 文件后就可以使用命令 `php encode_files.php` 开始加密项目。
 
 ------------------------------
 
