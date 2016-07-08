@@ -98,7 +98,7 @@ char *allow_networkcards[] = {
 作者: liexusong(280259971@qq.com)。
 
 <b>my book:《<a href="http://book.jd.com/11123177.html">PHP核心技术与最佳实践</a>》</b>此书有详细的PHP扩展编写教程<br/>
-# 捐赠本项目:
+# 觉得本项目不错的话可以捐赠本项目:
 <p>
 支付宝：<br />
 <img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" /></p>
