@@ -361,7 +361,7 @@ int decrypt_file(int stream, char **retbuf,
      * 1 INT_SIZE is dump length,
      * 1 INT_SIZE is expire time.
      */
-    headerlen = encrypt_file_header_length + INT_SIZE * 2);
+    headerlen = encrypt_file_header_length + INT_SIZE * 2;
 
     if (read(stream, header, headerlen) != headerlen
         || memcmp(header, encrypt_file_header_sign, encrypt_file_header_length))
