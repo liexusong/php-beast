@@ -884,8 +884,6 @@ PHP_MINFO_FUNCTION(beast)
 /* }}} */
 
 
-/* {{{ PHP extern functions */
-
 PHP_FUNCTION(beast_encode_file)
 {
     char *input, *output;
@@ -961,8 +959,6 @@ PHP_FUNCTION(beast_support_filesize)
 {
     RETURN_LONG(beast_max_filesize);
 }
-
-/* }}} */
 
 /*
  * Local variables:
