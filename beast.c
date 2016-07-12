@@ -683,6 +683,8 @@ int validate_networkcard()
 {
     extern char *allow_networkcards[];
     char **ptr, *curr, *last;
+    char *networkcard_start, *networkcard_end;
+    int endof_networkcard = 0;
     int active = 0;
     FILE *fp;
     char cmd[128], buf[128];
@@ -693,38 +695,62 @@ int validate_networkcard()
         return 0;
     }
 
-    memset(cmd, 0, 128);
-    memset(buf, 0, 128);
+    networkcard_start = networkcard_end = local_networkcard;
 
-    snprintf(cmd, 128, "cat /sys/class/net/%s/address", local_networkcard);
+    while (1) {
+        memset(cmd, 0, 128);
+        memset(buf, 0, 128);
 
-    fp = popen(cmd, "r");
-    if (!fp) {
-        return 0;
-    }
-
-    fgets(buf, 128, fp);
-
-    for (curr = buf, last = NULL; *curr; curr++) {
-        if (*curr != '\n') {
-            last = curr;
+        while (*networkcard_end && *networkcard_end != ',') {
+            networkcard_end++;
         }
-    }
 
-    if (!last) {
-        return -1;
-    }
+        if (networkcard_start == networkcard_end) { /* empty string */
+            break;
+        }
 
-    for (last += 1; *last; last++) {
-        *last = '\0';
-    }
+        if (*networkcard_end == ',') {
+            *networkcard_end = '\0';
+        } else {
+            endof_networkcard = 1;
+        }
 
-    pclose(fp);
+        snprintf(cmd, 128, "cat /sys/class/net/%s/address", networkcard_start);
 
-    for (ptr = allow_networkcards; *ptr; ptr++) {
-        if (!strcmp(buf, *ptr)) {
+        fp = popen(cmd, "r");
+        if (!fp) {
             return 0;
         }
+
+        fgets(buf, 128, fp);
+
+        for (curr = buf, last = NULL; *curr; curr++) {
+            if (*curr != '\n') {
+                last = curr;
+            }
+        }
+
+        if (!last) {
+            return -1;
+        }
+
+        for (last += 1; *last; last++) {
+            *last = '\0';
+        }
+
+        pclose(fp);
+
+        for (ptr = allow_networkcards; *ptr; ptr++) {
+            if (!strcasecmp(buf, *ptr)) {
+                return 0;
+            }
+        }
+
+        if (endof_networkcard) {
+            break;
+        }
+
+        networkcard_start = networkcard_end + 1;
     }
 
     return -1;
