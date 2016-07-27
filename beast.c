@@ -797,11 +797,15 @@ PHP_MINIT_FUNCTION(beast)
     close(fds[0]);
     close(fds[1]);
 
-    if (beast_cache_init(max_cache_size) == -1
-        || beast_log_init(beast_log_file) == -1)
-    {
+    if (beast_cache_init(max_cache_size) == -1) {
         php_error_docref(NULL TSRMLS_CC,
                          E_ERROR, "Unable initialize cache for beast");
+        return FAILURE;
+    }
+
+    if (beast_log_init(beast_log_file) == -1) {
+        php_error_docref(NULL TSRMLS_CC,
+                         E_ERROR, "Unable open log file for beast");
         return FAILURE;
     }
 
