@@ -34,6 +34,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "zend.h"
 #include "zend_operators.h"
 #include "zend_globals.h"
+#include "zend_highlight.h"
 #include "php_globals.h"
 #include "zend_language_scanner.h"
 #include <zend_language_parser.h>
@@ -445,7 +446,8 @@ failed:
 zend_op_array *
 cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 {
-    char *opened_path, *buffer;
+    zend_string *opened_path;
+    char *buffer;
     int fd;
     FILE *filep = NULL;
     int size, free_buffer = 0, destroy_read_shadow = 1;
@@ -927,7 +929,7 @@ PHP_FUNCTION(beast_encode_file)
     otmp[output_len] = 0;
 
     if (argc > 2 && ZSTR_LEN(date) > 0) {
-        int now;
+        zend_long now;
         expire_datetime = ZSTR_VAL(date);
         expire = php_parse_date(expire_datetime, &now);
         if (expire < 0) {
