@@ -34,7 +34,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "zend.h"
 #include "zend_operators.h"
 #include "zend_globals.h"
-#include "zend_highlight.h"
 #include "php_globals.h"
 #include "zend_language_scanner.h"
 #include <zend_language_parser.h>
@@ -257,16 +256,14 @@ int encrypt_file(const char *inputfile,
     /* Get php codes from script file */
     if (filter_code_comments((char *)inputfile, &codes) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                              "Unable get codes from php file '%s'", inputfile);
+                              "Unable get codes from php file `%s'", inputfile);
         return -1;
     }
 
     need_free_code = 1;
 
-    //inlen = codes.value.str.len;
-    inlen = Z_STRLEN(codes);
-    //inbuf = codes.value.str.val;
-    inbuf = Z_STRVAL(codes);
+    inlen = codes.value.str.len;
+    inbuf = codes.value.str.val;
 
     /* PHP file size can not large than beast_max_filesize */
     if (inlen > beast_max_filesize) {
@@ -275,7 +272,7 @@ int encrypt_file(const char *inputfile,
 
     /* Open output file */
     output_stream = php_stream_open_wrapper((char *)outputfile, "w+",
-        IGNORE_URL_WIN | REPORT_ERRORS, NULL);
+        ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
     if (!output_stream) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                                         "Unable to open file `%s'", outputfile);
@@ -293,8 +290,8 @@ int encrypt_file(const char *inputfile,
 
     php_stream_write(output_stream,
         encrypt_file_header_sign, encrypt_file_header_length);
-    php_stream_write(output_stream, (char *)&dumplen, INT_SIZE);
-    php_stream_write(output_stream, (char *)&expireval, INT_SIZE);
+    php_stream_write(output_stream, &dumplen, INT_SIZE);
+    php_stream_write(output_stream, &expireval, INT_SIZE);
 
     if (ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
@@ -446,8 +443,7 @@ failed:
 zend_op_array *
 cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 {
-    zend_string *opened_path;
-    char *buffer;
+    char *opened_path, *buffer;
     int fd;
     FILE *filep = NULL;
     int size, free_buffer = 0, destroy_read_shadow = 1;
@@ -552,14 +548,14 @@ ZEND_INI_MH(php_beast_cache_size)
 {
     int len;
 
-    if (ZSTR_LEN(new_value) == 0) {
+    if (new_value_length == 0) {
         return FAILURE;
     }
 
-    beast_atoi(ZSTR_VAL(new_value), &max_cache_size, &len);
+    beast_atoi(new_value, &max_cache_size, &len);
 
-    if (len > 0 && len < ZSTR_LEN(new_value)) {
-        switch (new_value->val[len]) {
+    if (len > 0 && len < new_value_length) {
+        switch (new_value[len]) {
         case 'k':
         case 'K':
             max_cache_size *= 1024;
@@ -585,11 +581,11 @@ ZEND_INI_MH(php_beast_cache_size)
 
 ZEND_INI_MH(php_beast_log_file)
 {
-    if (ZSTR_LEN(new_value) == 0) {
+    if (new_value_length == 0) {
         return FAILURE;
     }
 
-    beast_log_file = estrdup(ZSTR_VAL(new_value));
+    beast_log_file = strdup(new_value);
     if (beast_log_file == NULL) {
         return FAILURE;
     }
@@ -600,11 +596,11 @@ ZEND_INI_MH(php_beast_log_file)
 
 ZEND_INI_MH(php_beast_enable)
 {
-    if (ZSTR_LEN(new_value) == 0) {
+    if (new_value_length == 0) {
         return FAILURE;
     }
 
-    if (!strcasecmp(ZSTR_VAL(new_value), "on") || !strcmp(ZSTR_VAL(new_value), "1")) {
+    if (!strcasecmp(new_value, "on") || !strcmp(new_value, "1")) {
         beast_enable = 1;
     } else {
         beast_enable = 0;
@@ -616,11 +612,11 @@ ZEND_INI_MH(php_beast_enable)
 
 ZEND_INI_MH(php_beast_encrypt_handler)
 {
-    if (ZSTR_LEN(new_value) == 0) {
+    if (new_value_length == 0) {
         return FAILURE;
     }
 
-    default_ops_name = estrdup(ZSTR_VAL(new_value));
+    default_ops_name = strdup(new_value);
     if (default_ops_name == NULL) {
         return FAILURE;
     }
@@ -631,11 +627,11 @@ ZEND_INI_MH(php_beast_encrypt_handler)
 
 ZEND_INI_MH(php_beast_set_networkcard)
 {
-    if (ZSTR_LEN(new_value) == 0) {
+    if (new_value_length == 0) {
         return FAILURE;
     }
 
-    local_networkcard = estrdup(ZSTR_VAL(new_value));
+    local_networkcard = strdup(new_value);
     if (local_networkcard == NULL) {
         return FAILURE;
     }
@@ -801,11 +797,15 @@ PHP_MINIT_FUNCTION(beast)
     close(fds[0]);
     close(fds[1]);
 
-    if (beast_cache_init(max_cache_size) == -1
-        || beast_log_init(beast_log_file) == -1)
-    {
+    if (beast_cache_init(max_cache_size) == -1) {
         php_error_docref(NULL TSRMLS_CC,
                          E_ERROR, "Unable initialize cache for beast");
+        return FAILURE;
+    }
+
+    if (beast_log_init(beast_log_file) == -1) {
+        php_error_docref(NULL TSRMLS_CC,
+                         E_ERROR, "Unable open log file for beast");
         return FAILURE;
     }
 
@@ -890,25 +890,20 @@ PHP_MINFO_FUNCTION(beast)
 
 PHP_FUNCTION(beast_encode_file)
 {
-    zend_string *in, *out, *date;
     char *input, *output;
     char *itmp, *otmp;
     int input_len, output_len;
     char *expire_datetime = NULL;
+    int expire_datetime_len = 0;
     signed long expire = 0;
     int retval;
-    int argc = ZEND_NUM_ARGS();
 
-    if (zend_parse_parameters(argc TSRMLS_CC, "SS|S",
-            &in, &out, &date) == FAILURE)
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|s",
+            &input, &input_len, &output, &output_len, &expire_datetime,
+            &expire_datetime_len TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
-
-    input = ZSTR_VAL(in);
-    output = ZSTR_VAL(out);
-    input_len = ZSTR_LEN(in);
-    output_len = ZSTR_LEN(out);
 
     itmp = malloc(input_len + 1);
     otmp = malloc(output_len + 1);
@@ -924,9 +919,8 @@ PHP_FUNCTION(beast_encode_file)
     memcpy(otmp, output, output_len);
     otmp[output_len] = 0;
 
-    if (argc > 2 && ZSTR_LEN(date) > 0) {
-        zend_long now;
-        expire_datetime = ZSTR_VAL(date);
+    if (expire_datetime) {
+        int now;
         expire = php_parse_date(expire_datetime, &now);
         if (expire < 0) {
             expire = 0;
@@ -978,4 +972,3 @@ PHP_FUNCTION(beast_support_filesize)
  * vim600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
-
