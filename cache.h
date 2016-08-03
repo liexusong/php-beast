@@ -27,5 +27,6 @@ int beast_cache_destroy();
 
 void beast_cache_lock();
 void beast_cache_unlock();
+void beast_cache_info(zval *);
 
 #endif
