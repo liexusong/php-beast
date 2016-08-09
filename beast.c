@@ -671,10 +671,26 @@ int set_nonblock(int fd)
 
 void segmentfault_deadlock_fix(int sig)
 {
-    beast_write_log(beast_log_error,
-                    "Segment fault and fix deadlock");
+    void *array[10] = {0};
+    size_t size;
+    char **info = NULL;
+    int i;
+
+    size = backtrace(array, 10);
+    info = backtrace_symbols(array, size);
+
+    beast_write_log(beast_log_error, "Segmentation fault and fix deadlock");
+
+    if (info) {
+        for (i = 0; i < size; i++) {
+            beast_write_log(beast_log_error, info[i]);
+        }
+        free(info);
+    }
+
     beast_mm_unlock();     /* Maybe lock mm so free here */
     beast_cache_unlock();  /* Maybe lock cache so free here */
+
     exit(sig);
 }
 
