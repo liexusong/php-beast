@@ -245,7 +245,7 @@ int beast_mm_init(int block_size)
     if (!beast_mm_block) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for beast");
-        munmap(mm_lock, sizeof(int));
+        munmap((void *)mm_lock, sizeof(int));
         return -1;
     }
 
@@ -388,8 +388,10 @@ int beast_mm_realspace()
 void beast_mm_destroy()
 {
     if (beast_mm_initialized) {
-        munmap(beast_mm_block, beast_mm_block_size); /* free cache's memory */
-        munmap(mm_lock, sizeof(int));  /* free memory lock */
+        /* Free cache memory */
+        munmap((void *)beast_mm_block, beast_mm_block_size);
+        /* Free memory lock */
+        munmap((void *)mm_lock, sizeof(int));
         beast_mm_initialized = 0;
     }
 }

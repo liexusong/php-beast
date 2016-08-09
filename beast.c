@@ -660,8 +660,8 @@ int set_nonblock(int fd)
 {
     int flags;
 
-    if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+    if ((flags = fcntl(fd, F_GETFL, 0)) == -1
+        || fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
     {
         return -1;
     }
@@ -789,8 +789,9 @@ PHP_MINIT_FUNCTION(beast)
     }
 
     while (1) {
-        if (write(fds[1], "", 1) != 1)
+        if (write(fds[1], "", 1) != 1) {
             break;
+        }
         beast_max_filesize++;
     }
 
