@@ -100,7 +100,7 @@ int beast_cache_init(int size)
     if (!beast_cache_buckets) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for cache buckets");
-        munmap(cache_lock, sizeof(int));
+        munmap((void *)cache_lock, sizeof(int));
         beast_mm_destroy();
         return -1;
     }
@@ -224,10 +224,10 @@ int beast_cache_destroy()
     beast_mm_destroy(); /* destroy memory manager */
 
     /* free cache buckets's mmap memory */
-    munmap(beast_cache_buckets,
+    munmap((void *)beast_cache_buckets,
            sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
 
-    munmap(cache_lock, sizeof(int));
+    munmap((void *)cache_lock, sizeof(int));
 
     beast_cache_initialization = 0;
 
