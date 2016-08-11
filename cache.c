@@ -55,7 +55,12 @@ void beast_cache_unlock()
 static inline unsigned int
 beast_cache_hash(cache_key_t *key)
 {
-    return key->device * 3 + key->inode * 7;
+    unsigned int retval;
+
+    retval = (unsigned int)key->device * 3
+           + (unsigned int)key->inode * 7;
+
+    return retval;
 }
 
 
