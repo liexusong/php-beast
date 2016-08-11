@@ -11,7 +11,7 @@
 <pre>
 此模块可以用于商业用途, 版权归原作者.<br/>
 QQ交流群：239243332<br/>
-<span style="font-size:1em;color:#f00;">安装此扩展必须使用非线程安全版本，否则可能出错！！！</span>
+<b>安装此扩展必须使用非线程安全版本，否则可能出错！！！</b>
 </pre>
 
 <b>php-beast可以自定义加密模块，加密模块编写教程: <a href="https://github.com/liexusong/php-beast/wiki/%E5%8A%A0%E5%AF%86%E6%A8%A1%E5%9D%97%E7%BC%96%E5%86%99%E6%95%99%E7%A8%8B">点击</a></b>
