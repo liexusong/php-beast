@@ -46,6 +46,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "main/SAPI.h"
 #include "ext/standard/info.h"
 #include "ext/date/php_date.h"
+#include "ext/date/lib/timelib.h"
 #include "php_streams.h"
 #include "php_beast.h"
 #include "beast_mm.h"
@@ -959,6 +960,47 @@ error:
 }
 
 
+static long
+beast_strtotime(char *times)
+{
+    char *initial_ts;
+    int   time_len = strlen(times);
+    int   error1, error2;
+    struct timelib_error_container *error;
+    long  ts;
+
+    timelib_time *t, *now;
+    timelib_tzinfo *tzi;
+
+    if (time_len <= 0) {
+        return -1;
+    }
+
+    tzi = get_timezone_info(TSRMLS_C);
+
+    now = timelib_time_ctor();
+    now->tz_info = tzi;
+    now->zone_type = TIMELIB_ZONETYPE_ID;
+    timelib_unixtime2local(now, (timelib_sll)time(NULL));
+
+    t = timelib_strtotime(times, time_len, &error, DATE_TIMEZONEDB, php_date_parse_tzfile_wrapper);
+    error1 = error->error_count;
+    timelib_error_container_dtor(error);
+    timelib_fill_holes(t, now, TIMELIB_NO_CLONE);
+    timelib_update_ts(t, tzi);
+    ts = timelib_date_to_int(t, &error2);
+
+    timelib_time_dtor(now);
+    timelib_time_dtor(t);
+
+    if (error1 || error2) {
+        return -1;
+    }
+
+    return ts;
+}
+
+
 PHP_FUNCTION(beast_encode_file)
 {
     char *input, *output;
@@ -966,7 +1008,7 @@ PHP_FUNCTION(beast_encode_file)
     int input_len, output_len;
     char *expire_datetime = NULL;
     int expire_datetime_len = 0;
-    signed long expire = 0;
+    long expire = 0;
     int retval;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|s",
@@ -992,7 +1034,7 @@ PHP_FUNCTION(beast_encode_file)
 
     if (expire_datetime) {
         int now;
-        expire = php_parse_date(expire_datetime, &now);
+        expire = beast_strtotime(expire_datetime);
         if (expire < 0) {
             expire = 0;
         }
