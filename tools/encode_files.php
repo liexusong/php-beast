@@ -73,12 +73,12 @@ function encrypt_directory($dir, $new_dir, $expire)
 
             if (strtolower($infos[count($infos)-1]) == 'php') {
                 if (!empty($expire)) {
-                    $retval = beast_encode_file($path, $new_path, $expire);
+                    $result = beast_encode_file($path, $new_path, $expire);
                 } else {
-                    $retval = beast_encode_file($path, $new_path);
+                    $result = beast_encode_file($path, $new_path);
                 }
 
-                if (!$retval) {
+                if (!$result) {
                     echo "Failed to encode file `{$path}'\n";
                 }
 
@@ -115,6 +115,11 @@ if (empty($src_path) || !is_dir($src_path)) {
 if (empty($dst_path) || (!is_dir($dst_path) && !mkdir($dst_path, 0777))) {
     exit("Fatal: can not create directory `{$dst_path}'\n\n");
 }
+
+printf("Source code path: %s\n", $src_path);
+printf("Destination code path: %s\n", $dst_path);
+printf("Expire time: %s\n", $expire);
+printf("------------- start process -------------\n");
 
 $time = microtime(TRUE);
 
