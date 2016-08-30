@@ -946,9 +946,9 @@ PHP_FUNCTION(beast_file_expire)
 
     if (expire > 0) {
         string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
-        RETVAL_STRING(string, 0);
+        RETURN_STRING(string, 0);
     } else {
-        RETVAL_STRING("0000-00-00 00:00:00", 1);
+        RETURN_STRING("0000-00-00 00:00:00", 1);
     }
 
 error:
