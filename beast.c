@@ -291,8 +291,8 @@ int encrypt_file(const char *inputfile,
 
     php_stream_write(output_stream,
         encrypt_file_header_sign, encrypt_file_header_length);
-    php_stream_write(output_stream, &dumplen, INT_SIZE);
-    php_stream_write(output_stream, &expireval, INT_SIZE);
+    php_stream_write(output_stream, (const char *)&dumplen, INT_SIZE);
+    php_stream_write(output_stream, (const char *)&expireval, INT_SIZE);
 
     if (ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
@@ -678,7 +678,7 @@ void segmentfault_deadlock_fix(int sig)
     int i;
 
     size = backtrace(array, 10);
-    info = backtrace_symbols(array, size);
+    info = backtrace_symbols(array, (int)size);
 
     beast_write_log(beast_log_error, "Segmentation fault and fix deadlock");
 
@@ -739,7 +739,7 @@ int validate_networkcard()
             return 0;
         }
 
-        fgets(buf, 128, fp);
+        (void)fgets(buf, 128, fp);
 
         for (curr = buf, last = NULL; *curr; curr++) {
             if (*curr != '\n') {
@@ -969,7 +969,7 @@ PHP_FUNCTION(beast_encode_file)
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|l",
             &input, &input_len, &output, &output_len,
-            &expire, TSRMLS_CC) == FAILURE)
+            &expire TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
