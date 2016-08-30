@@ -92,6 +92,7 @@ zend_function_entry beast_functions[] = {
     PHP_FE(beast_avail_cache,      NULL)
     PHP_FE(beast_cache_info,       NULL)
     PHP_FE(beast_support_filesize, NULL)
+    PHP_FE(beast_file_expire,      NULL)
     {NULL, NULL, NULL}    /* Must be the last line in beast_functions[] */
 };
 /* }}} */
@@ -903,6 +904,59 @@ PHP_MINFO_FUNCTION(beast)
     DISPLAY_INI_ENTRIES();
 }
 /* }}} */
+
+
+PHP_FUNCTION(beast_file_expire)
+{
+    char *file;
+    int file_len;
+    char header[HEADER_MAX_SIZE] = {0};
+    int header_len;
+    signed long expire = 0;
+    int fd = -1;
+    char *string;
+    char *format = "Y-m-d H:i:s";
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s",
+                              &file, &file_len TSRMLS_CC) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    fd = open(file, O_RDONLY);
+    if (fd < 0) {
+        goto error;
+    }
+
+    header_len = encrypt_file_header_length + INT_SIZE * 2;
+
+    if (read(fd, header, header_len) != header_len
+        || memcmp(header, encrypt_file_header_sign, encrypt_file_header_length))
+    {
+        goto error;
+    }
+
+    close(fd);
+
+    expire = *((int *)&header[encrypt_file_header_length + INT_SIZE]);
+
+    if (little_endian()) {
+        expire = swab32(expire);
+    }
+
+    if (expire > 0) {
+        string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
+        RETURN_STRING(string, 0);
+    } else {
+        RETURN_STRING("0000-00-00 00:00:00", 1);
+    }
+
+error:
+    if (fd >= 0) {
+        close(fd);
+    }
+    RETURN_FALSE;
+}
 
 
 PHP_FUNCTION(beast_encode_file)
