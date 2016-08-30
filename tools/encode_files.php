@@ -130,7 +130,7 @@ if ($expire) {
 
     $fixtime = strtotime($expire) - $expiretime;
 
-    $expiretime += $fixtime;
+    $expiretime -= $fixtime;
 
     ini_set('date.timezone', $oldtimezone);
 
