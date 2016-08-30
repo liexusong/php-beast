@@ -964,14 +964,12 @@ PHP_FUNCTION(beast_encode_file)
     char *input, *output;
     char *itmp, *otmp;
     int input_len, output_len;
-    char *expire_datetime = NULL;
-    int expire_datetime_len = 0;
-    signed long expire = 0;
+    long expire = 0;
     int retval;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|s",
-            &input, &input_len, &output, &output_len, &expire_datetime,
-            &expire_datetime_len TSRMLS_CC) == FAILURE)
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|l",
+            &input, &input_len, &output, &output_len,
+            &expire, TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
@@ -990,15 +988,7 @@ PHP_FUNCTION(beast_encode_file)
     memcpy(otmp, output, output_len);
     otmp[output_len] = 0;
 
-    if (expire_datetime) {
-        int now;
-        expire = php_parse_date(expire_datetime, &now);
-        if (expire < 0) {
-            expire = 0;
-        }
-    }
-
-    retval = encrypt_file(itmp, otmp, expire TSRMLS_CC);
+    retval = encrypt_file(itmp, otmp, (int)expire TSRMLS_CC);
 
     free(itmp);
     free(otmp);

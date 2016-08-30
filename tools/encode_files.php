@@ -121,26 +121,15 @@ printf("Destination code path: %s\n", $dst_path);
 printf("Expire time: %s\n", $expire);
 printf("------------- start process -------------\n");
 
+$expire_time = 0;
 if ($expire) {
-    $expiretime = strtotime($expire);
-
-    $oldtimezone = ini_get('date.timezone');
-
-    ini_set('date.timezone', 'UTC');
-
-    $fixtime = strtotime($expire) - $expiretime;
-
-    $expiretime -= $fixtime;
-
-    ini_set('date.timezone', $oldtimezone);
-
-    $expire = date('Y-m-d H:i:s', $expiretime);
+    $expire_time = strtotime($expire);
 }
 
 $time = microtime(TRUE);
 
 calculate_directory_schedule($src_path);
-encrypt_directory($src_path, $dst_path, $expire);
+encrypt_directory($src_path, $dst_path, $expire_time);
 
 $used = microtime(TRUE) - $time;
 
