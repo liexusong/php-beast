@@ -943,7 +943,8 @@ PHP_FUNCTION(beast_encode_file)
         RETURN_FALSE;
     }
 
-    ret = encrypt_file(input, output, (int)expire, encrypt_type TSRMLS_CC);
+    ret = encrypt_file(input, output,
+                      (int)expire, (int)encrypt_type TSRMLS_CC);
     if (ret == -1) {
         RETURN_FALSE;
     }
