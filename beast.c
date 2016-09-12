@@ -54,7 +54,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_module.h"
 
 
-#define BEAST_VERSION       "2.2"
+#define BEAST_VERSION       "2.3"
 #define DEFAULT_CACHE_SIZE  10485760   /* 10MB */
 #define HEADER_MAX_SIZE     256
 #define INT_SIZE            (sizeof(int))
@@ -71,14 +71,11 @@ int beast_ncpu;
 /* True global resources - no need for thread safety here */
 static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 
-static struct beast_ops *ops_head = NULL;
-
 static int le_beast;
 static int max_cache_size = DEFAULT_CACHE_SIZE;
 static int cache_hits = 0;
 static int cache_miss = 0;
 static int beast_enable = 1;
-static char *default_ops_name = NULL;
 static int beast_max_filesize = 0;
 static char *local_networkcard = NULL;
 static int beast_now_time = 0;
@@ -143,43 +140,6 @@ static int big_endian()
 }
 
 
-int beast_register_ops(struct beast_ops *ops)
-{
-    if (!ops->name || !ops->encrypt || !ops->decrypt) {
-        return -1;
-    }
-
-    ops->next = ops_head;
-    ops_head = ops;
-
-    return 0;
-}
-
-
-struct beast_ops *beast_get_default_ops()
-{
-    static struct beast_ops *default_ops = NULL;
-
-    if (default_ops) {
-        return default_ops;
-    }
-
-    default_ops = ops_head;
-
-    while (default_ops) {
-        if (!strcasecmp(default_ops->name, default_ops_name)) {
-            return default_ops;
-        }
-        default_ops = default_ops->next;
-    }
-
-    /* not found and set first handler */
-    default_ops = ops_head;
-
-    return default_ops;
-}
-
-
 int filter_code_comments(char *filename, zval *retval)
 {
     zend_lex_state original_lex_state;
@@ -238,6 +198,19 @@ int filter_code_comments(char *filename, zval *retval)
 }
 
 
+struct beast_ops *beast_get_encrypt_algo(int type)
+{
+    struct beast_ops *found_pos = NULL;
+    int index = type - 1;
+
+    if (index <= 0 || index >= BEAST_ENCRYPT_TYPE_ERROR) {
+        return ops_handler_list[0];
+    }
+
+    return ops_handler_list[index];
+}
+
+
 /*****************************************************************************
 *                                                                            *
 *  Encrypt a plain text file and output a cipher file                        *
@@ -245,14 +218,15 @@ int filter_code_comments(char *filename, zval *retval)
 *****************************************************************************/
 
 int encrypt_file(const char *inputfile,
-    const char *outputfile, int expire TSRMLS_DC)
+    const char *outputfile, int expire,
+    int encrypt_type TSRMLS_DC)
 {
     php_stream *output_stream = NULL;
     zval codes;
     int need_free_code = 0;
     char *inbuf, *outbuf;
-    int inlen, outlen, dumplen, expireval;
-    struct beast_ops *ops = beast_get_default_ops();
+    int inlen, outlen, dumplen, expireval, dumptype;
+    struct beast_ops *encrypt_ops = beast_get_encrypt_algo(encrypt_type);
 
     /* Get php codes from script file */
     if (filter_code_comments((char *)inputfile, &codes) == -1) {
@@ -284,17 +258,21 @@ int encrypt_file(const char *inputfile,
     if (little_endian()) {
         dumplen   = swab32(inlen);
         expireval = swab32(expire);
+        dumptype  = swab32(encrypt_type);
+
     } else {
         dumplen   = inlen;
         expireval = expire;
+        dumptype  = encrypt_type;
     }
 
     php_stream_write(output_stream,
         encrypt_file_header_sign, encrypt_file_header_length);
     php_stream_write(output_stream, (const char *)&dumplen, INT_SIZE);
     php_stream_write(output_stream, (const char *)&expireval, INT_SIZE);
+    php_stream_write(output_stream, (const char *)&dumptype, INT_SIZE);
 
-    if (ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
+    if (encrypt_ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                                      "Unable to encrypt file `%s'", outputfile);
         goto failed;
@@ -303,8 +281,8 @@ int encrypt_file(const char *inputfile,
     php_stream_write(output_stream, outbuf, outlen);
     php_stream_close(output_stream);
     zval_dtor(&codes);
-    if (ops->free)
-        ops->free(outbuf);
+    if (encrypt_ops->free)
+        encrypt_ops->free(outbuf);
     return 0;
 
 failed:
@@ -323,7 +301,8 @@ failed:
 *****************************************************************************/
 
 int decrypt_file(int stream, char **retbuf,
-    int *retlen, int *free_buffer TSRMLS_DC)
+    int *retlen, int *free_buffer,
+    struct beast_ops **encrypt_handler TSRMLS_DC)
 {
     struct stat stat_ssb;
     cache_key_t findkey;
@@ -333,7 +312,8 @@ int decrypt_file(int stream, char **retbuf,
     int headerlen;
     char *buffer = NULL, *decbuf;
     int declen;
-    struct beast_ops *ops = beast_get_default_ops();
+    int entype;
+    struct beast_ops *encrypt_ops;
     int retval = -1;
 
     *free_buffer = 0; /* set free buffer flag to false */
@@ -361,8 +341,9 @@ int decrypt_file(int stream, char **retbuf,
     /*
      * 1 INT_SIZE is dump length,
      * 1 INT_SIZE is expire time.
+     * 1 INT_SIZE is encrypt type.
      */
-    headerlen = encrypt_file_header_length + INT_SIZE * 2;
+    headerlen = encrypt_file_header_length + INT_SIZE * 3;
 
     if (read(stream, header, headerlen) != headerlen
         || memcmp(header, encrypt_file_header_sign, encrypt_file_header_length))
@@ -373,17 +354,22 @@ int decrypt_file(int stream, char **retbuf,
 
     /* real php script file's size */
     reallen = *((int *)&header[encrypt_file_header_length]);
-    expire = *((int *)&header[encrypt_file_header_length + INT_SIZE]);
+    expire  = *((int *)&header[encrypt_file_header_length + INT_SIZE]);
+    entype  = *((int *)&header[encrypt_file_header_length + 2 * INT_SIZE]);
 
     if (little_endian()) {
         reallen = swab32(reallen);
-        expire = swab32(expire);
+        expire  = swab32(expire);
+        entype  = swab32(entype);
     }
 
     if (expire > 0 && expire < beast_now_time) {
         retval = -2;
         goto failed;
     }
+
+    encrypt_ops = beast_get_encrypt_algo(entype);
+    *encrypt_handler = encrypt_ops;
 
     /**
      * how many bytes would be read from encrypt file,
@@ -395,7 +381,7 @@ int decrypt_file(int stream, char **retbuf,
 
     if (!(buffer = malloc(bodylen))
         || read(stream, buffer, bodylen) != bodylen
-        || ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1)
+        || encrypt_ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1)
     {
         retval = -1;
         goto failed;
@@ -415,8 +401,8 @@ int decrypt_file(int stream, char **retbuf,
         *retbuf = beast_cache_data(cache);
         *retlen = beast_cache_size(cache);
 
-        if (ops->free) {
-            ops->free(decbuf);
+        if (encrypt_ops->free) {
+            encrypt_ops->free(decbuf);
         }
 
     } else {
@@ -459,7 +445,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         goto final;
      }
 
-    retval = decrypt_file(fd, &buffer, &size, &free_buffer TSRMLS_CC);
+    retval = decrypt_file(fd, &buffer, &size, &free_buffer, &ops TSRMLS_CC);
     if (retval == -2) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                      "This program was expired, please contact administrator");
@@ -489,7 +475,6 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 
 final:
     if (free_buffer) {
-        ops = beast_get_default_ops();
         if (ops->free) {
             ops->free(buffer);
         }
@@ -611,21 +596,6 @@ ZEND_INI_MH(php_beast_enable)
 }
 
 
-ZEND_INI_MH(php_beast_encrypt_handler)
-{
-    if (new_value_length == 0) {
-        return FAILURE;
-    }
-
-    default_ops_name = strdup(new_value);
-    if (default_ops_name == NULL) {
-        return FAILURE;
-    }
-
-    return SUCCESS;
-}
-
-
 ZEND_INI_MH(php_beast_set_networkcard)
 {
     if (new_value_length == 0) {
@@ -648,8 +618,6 @@ PHP_INI_BEGIN()
           php_beast_log_file)
     PHP_INI_ENTRY("beast.enable", "1", PHP_INI_ALL,
           php_beast_enable)
-    PHP_INI_ENTRY("beast.encrypt_handler", "des-algo", PHP_INI_ALL,
-          php_beast_encrypt_handler)
     PHP_INI_ENTRY("beast.networkcard", "eth0", PHP_INI_ALL,
           php_beast_set_networkcard)
 PHP_INI_END()
@@ -778,7 +746,6 @@ int validate_networkcard()
  */
 PHP_MINIT_FUNCTION(beast)
 {
-    struct beast_ops **ops;
     int fds[2];
 
     /* If you have INI entries, uncomment these lines */
@@ -835,21 +802,14 @@ PHP_MINIT_FUNCTION(beast)
         beast_ncpu = 1;
     }
 
-    for (ops = ops_handler_list; *ops; ops++) {
-        if (beast_register_ops(*ops) == -1) {
-            php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                "Failed to register encrypt algorithms `%s'", (*ops)->name);
-            return FAILURE;
-        }
-    }
-
-    if (!ops_head) {
-        php_error_docref(NULL TSRMLS_CC,
-                         E_ERROR, "Havn't active encrypt algorithms in system");
-        return FAILURE;
-    }
-
     signal(SIGSEGV, segmentfault_deadlock_fix);
+
+    REGISTER_LONG_CONSTANT("BEAST_ENCRYPT_TYPE_DES",
+        BEAST_ENCRYPT_TYPE_DES, CONST_CS|CONST_PERSISTENT);
+    REGISTER_LONG_CONSTANT("BEAST_ENCRYPT_TYPE_AES",
+        BEAST_ENCRYPT_TYPE_AES, CONST_CS|CONST_PERSISTENT);
+    REGISTER_LONG_CONSTANT("BEAST_ENCRYPT_TYPE_BASE64",
+        BEAST_ENCRYPT_TYPE_BASE64, CONST_CS|CONST_PERSISTENT);
 
     return SUCCESS;
 }
@@ -962,38 +922,26 @@ error:
 PHP_FUNCTION(beast_encode_file)
 {
     char *input, *output;
-    char *itmp, *otmp;
     int input_len, output_len;
     long expire = 0;
-    int retval;
+    long encrypt_type = BEAST_ENCRYPT_TYPE_DES;
+    int ret;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|l",
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|ll",
             &input, &input_len, &output, &output_len,
-            &expire TSRMLS_CC) == FAILURE)
+            &expire, &encrypt_type TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    itmp = malloc(input_len + 1);
-    otmp = malloc(output_len + 1);
-    if (!itmp || !otmp) {
-        if (itmp) free(itmp);
-        if (otmp) free(otmp);
+    if (encrypt_type <= 0
+        || encrypt_type >= BEAST_ENCRYPT_TYPE_ERROR)
+    {
         RETURN_FALSE;
     }
 
-    memcpy(itmp, input, input_len);
-    itmp[input_len] = 0;
-
-    memcpy(otmp, output, output_len);
-    otmp[output_len] = 0;
-
-    retval = encrypt_file(itmp, otmp, (int)expire TSRMLS_CC);
-
-    free(itmp);
-    free(otmp);
-
-    if (retval == -1) {
+    ret = encrypt_file(input, output, (int)expire, encrypt_type TSRMLS_CC);
+    if (ret == -1) {
         RETURN_FALSE;
     }
 
