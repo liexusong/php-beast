@@ -39,7 +39,6 @@ $ sudo make && make install
  beast.cache_size = size
  beast.log_file = "path_to_log"
  beast.enable = On
- beast.encrypt_handler = "des-algo"
 </code></pre>
 
 支持的模块有：
@@ -70,8 +69,11 @@ dst_path = ""
 
 ; expire time
 expire = ""
+
+; encrypt type (selection: DES, AES, BASE64)
+encrypt_type = "DES"
 ```
-`src_path` 是要加密项目的路径，`dst_path` 是保存加密后项目的路径，`expire` 是设置项目可使用的时间 (`expire` 的格式是：`YYYY-mm-dd HH:ii:ss`)。
+`src_path` 是要加密项目的路径，`dst_path` 是保存加密后项目的路径，`expire` 是设置项目可使用的时间 (`expire` 的格式是：`YYYY-mm-dd HH:ii:ss`)。`encrypt_type`是加密的方式，选择项有：DES、AES、BASE64。
 修改完 `configure.ini` 文件后就可以使用命令 `php encode_files.php` 开始加密项目。
 
 ------------------------------

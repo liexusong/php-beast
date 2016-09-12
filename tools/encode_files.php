@@ -2,7 +2,7 @@
 
 /**
  * Encode files by directory
- * @author: xusong.lie
+ * @author: liexusong
  */
 
 $nfiles = 0;
@@ -41,7 +41,7 @@ function calculate_directory_schedule($dir)
     closedir($handle);
 }
 
-function encrypt_directory($dir, $new_dir, $expire)
+function encrypt_directory($dir, $new_dir, $expire, $type)
 {
     global $nfiles, $finish;
 
@@ -66,16 +66,17 @@ function encrypt_directory($dir, $new_dir, $expire)
                 mkdir($new_path, 0777);
             }
 
-            encrypt_directory($path, $new_path, $expire);
+            encrypt_directory($path, $new_path, $expire, $type);
 
         } else {
             $infos = explode('.', $file);
 
             if (strtolower($infos[count($infos)-1]) == 'php') {
-                if (!empty($expire)) {
-                    $result = beast_encode_file($path, $new_path, $expire);
+                if ($expire > 0) {
+                    $result = beast_encode_file($path, $new_path,
+                                                $expire, $type);
                 } else {
-                    $result = beast_encode_file($path, $new_path);
+                    $result = beast_encode_file($path, $new_path, 0, $type);
                 }
 
                 if (!$result) {
@@ -104,16 +105,36 @@ if (!$conf) {
     exit("Fatal: failed to read configure.ini file\n");
 }
 
-$src_path = trim($conf['src_path']);
-$dst_path = trim($conf['dst_path']);
-$expire   = trim($conf['expire']);
+$src_path     = trim($conf['src_path']);
+$dst_path     = trim($conf['dst_path']);
+$expire       = trim($conf['expire']);
+$encrypt_type = strtoupper(trim($conf['encrypt_type']));
 
 if (empty($src_path) || !is_dir($src_path)) {
     exit("Fatal: source path `{$src_path}' not exists\n\n");
 }
 
-if (empty($dst_path) || (!is_dir($dst_path) && !mkdir($dst_path, 0777))) {
+if (empty($dst_path)
+    || (!is_dir($dst_path)
+    && !mkdir($dst_path, 0777)))
+{
     exit("Fatal: can not create directory `{$dst_path}'\n\n");
+}
+
+switch ($encrypt_type)
+{
+case 'DES':
+    $entype = BEAST_ENCRYPT_TYPE_DES;
+    break;
+case 'AES':
+    $entype = BEAST_ENCRYPT_TYPE_AES;
+    break;
+case 'BASE64'
+    $entype = BEAST_ENCRYPT_TYPE_BASE64;
+    break;
+default:
+    $entype = BEAST_ENCRYPT_TYPE_DES;
+    break;
 }
 
 printf("Source code path: %s\n", $src_path);
@@ -129,7 +150,7 @@ if ($expire) {
 $time = microtime(TRUE);
 
 calculate_directory_schedule($src_path);
-encrypt_directory($src_path, $dst_path, $expire_time);
+encrypt_directory($src_path, $dst_path, $expire_time, $entype);
 
 $used = microtime(TRUE) - $time;
 
