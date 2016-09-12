@@ -136,6 +136,7 @@ static int big_endian()
     if(*((unsigned char *)&num) == 0x11) {
         return 1;
     }
+
     return 0;
 }
 
@@ -200,10 +201,9 @@ int filter_code_comments(char *filename, zval *retval)
 
 struct beast_ops *beast_get_encrypt_algo(int type)
 {
-    struct beast_ops *found_pos = NULL;
     int index = type - 1;
 
-    if (index <= 0 || index >= BEAST_ENCRYPT_TYPE_ERROR) {
+    if (index < 0 || index >= BEAST_ENCRYPT_TYPE_ERROR) {
         return ops_handler_list[0];
     }
 
@@ -247,7 +247,7 @@ int encrypt_file(const char *inputfile,
 
     /* Open output file */
     output_stream = php_stream_open_wrapper((char *)outputfile, "w+",
-        ENFORCE_SAFE_MODE | REPORT_ERRORS, NULL);
+                              ENFORCE_SAFE_MODE|REPORT_ERRORS, NULL);
     if (!output_stream) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                                         "Unable to open file `%s'", outputfile);
@@ -281,8 +281,11 @@ int encrypt_file(const char *inputfile,
     php_stream_write(output_stream, outbuf, outlen);
     php_stream_close(output_stream);
     zval_dtor(&codes);
-    if (encrypt_ops->free)
+
+    if (encrypt_ops->free) {
         encrypt_ops->free(outbuf);
+    }
+
     return 0;
 
 failed:
@@ -338,10 +341,10 @@ int decrypt_file(int stream, char **retbuf,
 
     /* not found cache and decrypt file */
 
-    /*
-     * 1 INT_SIZE is dump length,
-     * 1 INT_SIZE is expire time.
-     * 1 INT_SIZE is encrypt type.
+    /**
+     * 1) 1 int is dump length,
+     * 2) 1 int is expire time.
+     * 3) 1 int is encrypt type.
      */
     headerlen = encrypt_file_header_length + INT_SIZE * 3;
 
@@ -436,7 +439,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     int size, free_buffer = 0, destroy_read_shadow = 1;
     int shadow[2]= {0, 0};
     int retval;
-    struct beast_ops *ops;
+    struct beast_ops *ops = NULL;
 
     filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
      if (filep != NULL) {
@@ -474,7 +477,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     destroy_read_shadow = 0;
 
 final:
-    if (free_buffer) {
+    if (free_buffer && ops) {
         if (ops->free) {
             ops->free(buffer);
         }
