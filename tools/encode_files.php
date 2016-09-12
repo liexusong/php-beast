@@ -129,7 +129,7 @@ case 'DES':
 case 'AES':
     $entype = BEAST_ENCRYPT_TYPE_AES;
     break;
-case 'BASE64'
+case 'BASE64':
     $entype = BEAST_ENCRYPT_TYPE_BASE64;
     break;
 default:
