@@ -305,7 +305,7 @@ failed:
 
 int decrypt_file(int stream, char **retbuf,
     int *retlen, int *free_buffer,
-    struct beast_ops **encrypt_handler TSRMLS_DC)
+    struct beast_ops **ret_encrypt TSRMLS_DC)
 {
     struct stat stat_ssb;
     cache_key_t findkey;
@@ -371,8 +371,7 @@ int decrypt_file(int stream, char **retbuf,
         goto failed;
     }
 
-    encrypt_ops = beast_get_encrypt_algo(entype);
-    *encrypt_handler = encrypt_ops;
+    *ret_encrypt = encrypt_ops = beast_get_encrypt_algo(entype);
 
     /**
      * how many bytes would be read from encrypt file,
@@ -451,7 +450,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     retval = decrypt_file(fd, &buffer, &size, &free_buffer, &ops TSRMLS_CC);
     if (retval == -2) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                     "This program was expired, please contact administrator");
+            "This program was expired, please contact administrator");
         return NULL;
     }
 
@@ -766,7 +765,7 @@ PHP_MINIT_FUNCTION(beast)
 
     if ((encrypt_file_header_length + INT_SIZE * 2) > HEADER_MAX_SIZE) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                         "Header size overflow max size `%d'", HEADER_MAX_SIZE);
+            "Header size overflow max size `%d'", HEADER_MAX_SIZE);
         return FAILURE;
     }
 
