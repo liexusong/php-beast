@@ -65,8 +65,8 @@ extern struct beast_ops *ops_handler_list[];
 /*
  * Global vaiables for extension
  */
-char *beast_log_file;
-int beast_ncpu;
+char *beast_log_file = NULL;
+int beast_ncpu = 1;
 
 /* True global resources - no need for thread safety here */
 static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
@@ -570,7 +570,7 @@ ZEND_INI_MH(php_beast_cache_size)
 ZEND_INI_MH(php_beast_log_file)
 {
     if (new_value_length == 0) {
-        return FAILURE;
+        return SUCCESS;
     }
 
     beast_log_file = strdup(new_value);
