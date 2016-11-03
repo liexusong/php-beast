@@ -647,6 +647,8 @@ void segmentfault_deadlock_fix(int sig)
     char **info = NULL;
     int i;
 
+    /* CAUTION Alpine doesn't support backtrace_symbols. */
+    /*
     size = backtrace(array, 10);
     info = backtrace_symbols(array, (int)size);
 
@@ -658,6 +660,7 @@ void segmentfault_deadlock_fix(int sig)
         }
         free(info);
     }
+    */
 
     beast_mm_unlock();     /* Maybe lock mm so free here */
     beast_cache_unlock();  /* Maybe lock cache so free here */
