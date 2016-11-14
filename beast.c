@@ -79,6 +79,7 @@ static int beast_enable = 1;
 static int beast_max_filesize = 0;
 static char *local_networkcard = NULL;
 static int beast_now_time = 0;
+static int log_unencrypt_file = 0;
 
 /* {{{ beast_functions[]
  *
@@ -274,7 +275,7 @@ int encrypt_file(const char *inputfile,
 
     if (encrypt_ops->encrypt(inbuf, inlen, &outbuf, &outlen) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                                     "Unable to encrypt file `%s'", outputfile);
+                         "Unable to encrypt file `%s'", outputfile);
         goto failed;
     }
 
@@ -303,8 +304,8 @@ failed:
 *                                                                            *
 *****************************************************************************/
 
-int decrypt_file(int stream, char **retbuf,
-    int *retlen, int *free_buffer,
+int decrypt_file(char *filename, int stream,
+    char **retbuf, int *retlen, int *free_buffer,
     struct beast_ops **ret_encrypt TSRMLS_DC)
 {
     struct stat stat_ssb;
@@ -322,6 +323,8 @@ int decrypt_file(int stream, char **retbuf,
     *free_buffer = 0; /* set free buffer flag to false */
 
     if (fstat(stream, &stat_ssb) == -1) {
+        beast_write_log(beast_log_error,
+                      "Failed to readed state buffer from file `%s'", filename);
         retval = -1;
         goto failed;
     }
@@ -348,9 +351,21 @@ int decrypt_file(int stream, char **retbuf,
      */
     headerlen = encrypt_file_header_length + INT_SIZE * 3;
 
-    if (read(stream, header, headerlen) != headerlen
-        || memcmp(header, encrypt_file_header_sign, encrypt_file_header_length))
-    {
+    if (read(stream, header, headerlen) != headerlen) {
+        beast_write_log(beast_log_error,
+                        "Failed to readed header from file `%s'", filename);
+        retval = -1;
+        goto failed;
+    }
+
+    /* Not a encrypted file */
+    if (memcmp(header, encrypt_file_header_sign, encrypt_file_header_length)) {
+
+        if (log_unencrypt_file) {
+            beast_write_log(beast_log_error,
+                            "File `%s' isn't a encrypted file", filename);
+        }
+
         retval = -1;
         goto failed;
     }
@@ -367,6 +382,7 @@ int decrypt_file(int stream, char **retbuf,
     }
 
     if (expire > 0 && expire < beast_now_time) {
+        beast_write_log(beast_log_error, "File `%s' was expired", filename);
         retval = -2;
         goto failed;
     }
@@ -381,10 +397,26 @@ int decrypt_file(int stream, char **retbuf,
 
     bodylen = stat_ssb.st_size - headerlen;
 
-    if (!(buffer = malloc(bodylen))
-        || read(stream, buffer, bodylen) != bodylen
-        || encrypt_ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1)
-    {
+    /* 1) Alloc memory for decrypt file */
+    if (!(buffer = malloc(bodylen))) {
+        beast_write_log(beast_log_error,
+                        "Failed to alloc memory to file `%s'", filename);
+        retval = -1;
+        goto failed;
+    }
+
+    /* 2) Read file stream */
+    if (read(stream, buffer, bodylen) != bodylen) {
+        beast_write_log(beast_log_error,
+                        "Failed to readed stream from file `%s'", filename);
+        retval = -1;
+        goto failed;
+    }
+
+    /* 3) Decrypt file stream */
+    if (encrypt_ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1) {
+        beast_write_log(beast_log_error,
+                        "Failed to decrypted for file `%s'", filename);
         retval = -1;
         goto failed;
     }
@@ -447,10 +479,11 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         goto final;
      }
 
-    retval = decrypt_file(fd, &buffer, &size, &free_buffer, &ops TSRMLS_CC);
+    retval = decrypt_file(h->filename, fd, &buffer, &size,
+                          &free_buffer, &ops TSRMLS_CC);
     if (retval == -2) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-            "This program was expired, please contact administrator");
+                      "This program was expired, please contact administrator");
         return NULL;
     }
 
@@ -613,6 +646,22 @@ ZEND_INI_MH(php_beast_set_networkcard)
 }
 
 
+ZEND_INI_MH(php_beast_set_log_unencrypt_file)
+{
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    if (!strcasecmp(new_value, "on") || !strcmp(new_value, "1")) {
+        log_unencrypt_file = 1;
+    } else {
+        log_unencrypt_file = 0;
+    }
+
+    return SUCCESS;
+}
+
+
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "10485760", PHP_INI_ALL,
           php_beast_cache_size)
@@ -622,6 +671,8 @@ PHP_INI_BEGIN()
           php_beast_enable)
     PHP_INI_ENTRY("beast.networkcard", "eth0", PHP_INI_ALL,
           php_beast_set_networkcard)
+    PHP_INI_ENTRY("beast.log_unencrypt_file", "0", PHP_INI_ALL,
+          php_beast_set_log_unencrypt_file)
 PHP_INI_END()
 
 /* }}} */
