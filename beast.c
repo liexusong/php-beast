@@ -79,7 +79,7 @@ static int beast_enable = 1;
 static int beast_max_filesize = 0;
 static char *local_networkcard = NULL;
 static int beast_now_time = 0;
-static int log_unencrypt_file = 0;
+static int log_normal_file = 0;
 
 /* {{{ beast_functions[]
  *
@@ -361,7 +361,7 @@ int decrypt_file(char *filename, int stream,
     /* Not a encrypted file */
     if (memcmp(header, encrypt_file_header_sign, encrypt_file_header_length)) {
 
-        if (log_unencrypt_file) {
+        if (log_normal_file) {
             beast_write_log(beast_log_error,
                             "File `%s' isn't a encrypted file", filename);
         }
@@ -646,16 +646,16 @@ ZEND_INI_MH(php_beast_set_networkcard)
 }
 
 
-ZEND_INI_MH(php_beast_set_log_unencrypt_file)
+ZEND_INI_MH(php_beast_set_log_normal_file)
 {
     if (new_value_length == 0) {
         return FAILURE;
     }
 
     if (!strcasecmp(new_value, "on") || !strcmp(new_value, "1")) {
-        log_unencrypt_file = 1;
+        log_normal_file = 1;
     } else {
-        log_unencrypt_file = 0;
+        log_normal_file = 0;
     }
 
     return SUCCESS;
@@ -671,8 +671,8 @@ PHP_INI_BEGIN()
           php_beast_enable)
     PHP_INI_ENTRY("beast.networkcard", "eth0", PHP_INI_ALL,
           php_beast_set_networkcard)
-    PHP_INI_ENTRY("beast.log_unencrypt_file", "0", PHP_INI_ALL,
-          php_beast_set_log_unencrypt_file)
+    PHP_INI_ENTRY("beast.log_normal_file", "0", PHP_INI_ALL,
+          php_beast_set_log_normal_file)
 PHP_INI_END()
 
 /* }}} */
