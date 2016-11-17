@@ -21,7 +21,7 @@ $ unzip master.zip
 $ cd php-beast-master
 $ phpize
 $ ./configure
-$ sudo make && make install
+$ sudo make && sudo make install
 
 编译好之后修改php.ini配置文件, 加入配置项: extension=beast.so, 重启php-fpm
 </code></pre>
