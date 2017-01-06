@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "beast_log.h"
 #include "beast_module.h"
 #include "des_algo_lib.c"
 
@@ -77,6 +78,8 @@ int des_decrypt_handler(char *inbuf, int len,
 
     out = malloc(retlen);
     if (!out) {
+        beast_write_log(beast_log_error,
+                 "Out of memory when allocate `%d' size by DES module", retlen);
     	return -1;
     }
 

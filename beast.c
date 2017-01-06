@@ -416,7 +416,8 @@ int decrypt_file(char *filename, int stream,
     /* 3) Decrypt file stream */
     if (encrypt_ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1) {
         beast_write_log(beast_log_error,
-                        "Failed to decrypted for file `%s'", filename);
+                        "Failed to decrypted file `%s', using <%s> handler",
+                        filename, encrypt_ops->name);
         retval = -1;
         goto failed;
     }
