@@ -1,5 +1,11 @@
+/**
+ * AES encrypt algorithms handler module for Beast
+ * @author: liexusong
+ */
+
 #include <stdlib.h>
 #include <string.h>
+#include "beast_log.h"
 #include "beast_module.h"
 #include "aes_algo_lib.c"
 
@@ -22,6 +28,8 @@ int aes_encrypt_handler(char *inbuf, int len,
 
 	out = malloc(blocks * 16);
 	if (!out) {
+		beast_write_log(beast_log_error,
+               "Out of memory when allocate `%d' size by encrypt(AES)", retlen);
 		return -1;
 	}
 
@@ -62,6 +70,8 @@ int aes_decrypt_handler(char *inbuf, int len,
 
 	out = malloc(blocks * 16);
 	if (!out) {
+		beast_write_log(beast_log_error,
+               "Out of memory when allocate `%d' size by decrypt(AES)", retlen);
 		return -1;
 	}
 
