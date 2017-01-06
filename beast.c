@@ -238,8 +238,13 @@ int encrypt_file(const char *inputfile,
 
     need_free_code = 1;
 
+#if ZEND_MODULE_API_NO >= 20151012
+    inlen = Z_STRLEN(codes);
+    inbuf = Z_STRVAL(codes);
+#else
     inlen = codes.value.str.len;
     inbuf = codes.value.str.val;
+#endif
 
     /* PHP file size can not large than beast_max_filesize */
     if (inlen > beast_max_filesize) {
@@ -247,8 +252,14 @@ int encrypt_file(const char *inputfile,
     }
 
     /* Open output file */
+#if ZEND_MODULE_API_NO >= 20151012
+    output_stream = php_stream_open_wrapper((char *)outputfile, "w+",
+                              IGNORE_URL_WIN|REPORT_ERRORS, NULL);
+#else
     output_stream = php_stream_open_wrapper((char *)outputfile, "w+",
                               ENFORCE_SAFE_MODE|REPORT_ERRORS, NULL);
+#endif
+
     if (!output_stream) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
                                         "Unable to open file `%s'", outputfile);
@@ -466,7 +477,12 @@ failed:
 zend_op_array *
 cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 {
-    char *opened_path, *buffer;
+#if ZEND_MODULE_API_NO >= 20151012
+    zend_string *opened_path;
+#else
+    char *opened_path;
+#endif
+    char *buffer;
     int fd;
     FILE *filep = NULL;
     int size, free_buffer = 0, destroy_read_shadow = 1;
@@ -1038,6 +1054,12 @@ PHP_MINFO_FUNCTION(beast)
 /* }}} */
 
 
+#if ZEND_MODULE_API_NO >= 20151012
+# define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
+#else
+# define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str, dup)
+#endif
+
 PHP_FUNCTION(beast_file_expire)
 {
     char *file;
@@ -1093,25 +1115,12 @@ PHP_FUNCTION(beast_file_expire)
         expire = swab32(expire);
     }
 
-#if ZEND_MODULE_API_NO >= 20151012
-
     if (expire > 0) {
         string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
-        RETURN_STRING(string);
+        BEAST_RETURN_STRING(string, 0);
     } else {
-        RETURN_STRING("0000-00-00 00:00:00");
+        BEAST_RETURN_STRING("0000-00-00 00:00:00", 1);
     }
-
-#else
-
-    if (expire > 0) {
-        string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
-        RETURN_STRING(string, 0);
-    } else {
-        RETURN_STRING("0000-00-00 00:00:00", 1);
-    }
-
-#endif
 
 error:
     if (fd >= 0) {
