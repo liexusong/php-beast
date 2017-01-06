@@ -1093,6 +1093,17 @@ PHP_FUNCTION(beast_file_expire)
         expire = swab32(expire);
     }
 
+#if ZEND_MODULE_API_NO >= 20151012
+
+    if (expire > 0) {
+        string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
+        RETURN_STRING(string);
+    } else {
+        RETURN_STRING("0000-00-00 00:00:00");
+    }
+
+#else
+
     if (expire > 0) {
         string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
         RETURN_STRING(string, 0);
@@ -1100,10 +1111,13 @@ PHP_FUNCTION(beast_file_expire)
         RETURN_STRING("0000-00-00 00:00:00", 1);
     }
 
+#endif
+
 error:
     if (fd >= 0) {
         close(fd);
     }
+
     RETURN_FALSE;
 }
 
@@ -1120,7 +1134,7 @@ PHP_FUNCTION(beast_encode_file)
 
     zend_string *in, *out;
 
-    if (zend_parse_parameters(argc TSRMLS_CC, "SS|ll",
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "SS|ll",
         &in, &out, &expire, &encrypt_type) == FAILURE)
     {
         RETURN_FALSE;
