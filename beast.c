@@ -53,6 +53,11 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_log.h"
 #include "beast_module.h"
 
+#if ZEND_MODULE_API_NO >= 20151012
+# define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
+#else
+# define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str, dup)
+#endif
 
 #define BEAST_VERSION       "2.5"
 #define DEFAULT_CACHE_SIZE  10485760   /* 10MB */
@@ -960,10 +965,9 @@ PHP_MINIT_FUNCTION(beast)
         return FAILURE;
     }
 
-    while (1) {
-        if (write(fds[1], "", 1) != 1) {
+    for (;;) {
+        if (write(fds[1], "\0", 1) != 1)
             break;
-        }
         beast_max_filesize++;
     }
 
@@ -1053,12 +1057,6 @@ PHP_MINFO_FUNCTION(beast)
 }
 /* }}} */
 
-
-#if ZEND_MODULE_API_NO >= 20151012
-# define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
-#else
-# define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str, dup)
-#endif
 
 PHP_FUNCTION(beast_file_expire)
 {
@@ -1183,18 +1181,14 @@ PHP_FUNCTION(beast_encode_file)
 
 PHP_FUNCTION(beast_avail_cache)
 {
-    int size = beast_mm_availspace();
-
-    RETURN_LONG(size);
+    RETURN_LONG(beast_mm_availspace());
 }
 
 
 PHP_FUNCTION(beast_cache_info)
 {
     array_init(return_value);
-
     beast_cache_info(return_value);
-
     add_assoc_long(return_value, "cache_hits", cache_hits);
     add_assoc_long(return_value, "cache_miss", cache_miss);
 }
