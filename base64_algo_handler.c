@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "beast_log.h"
 #include "beast_module.h"
 
 static const char base64_table[] =
@@ -41,6 +42,7 @@ char *base64_encode(char *str, int length, int *ret_length)
 	char *current = str;
 	char *p;
 	char *result;
+	int alen;
 
 	if ((length + 2) < 0
 		|| ((length + 2) / 3) >= (1 << (sizeof(int) * 8 - 2)))
@@ -51,8 +53,12 @@ char *base64_encode(char *str, int length, int *ret_length)
 		return NULL;
 	}
 
-	result = malloc(((length + 2) / 3) * 4 + 1);
+	alen = ((length + 2) / 3) * 4 + 1;
+
+	result = malloc(alen);
 	if (!result) {
+		beast_write_log(beast_log_error,
+              "Out of memory when allocate `%d' size by encrypt(BASE64)", alen);
 		return NULL;
 	}
 
@@ -100,6 +106,8 @@ char *base64_decode(char *str, int length, int *ret_length)
 
 	result = malloc(length + 1);
 	if (result == NULL) {
+		beast_write_log(beast_log_error,
+          "Out of memory when allocate `%d' size by decrypt(BASE64)", length+1);
 		return NULL;
 	}
 
