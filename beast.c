@@ -54,7 +54,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_module.h"
 
 
-#define BEAST_VERSION       "2.3"
+#define BEAST_VERSION       "2.5"
 #define DEFAULT_CACHE_SIZE  10485760   /* 10MB */
 #define HEADER_MAX_SIZE     256
 #define INT_SIZE            (sizeof(int))
@@ -569,6 +569,44 @@ void beast_atoi(const char *str, int *ret, int *len)
 
 ZEND_INI_MH(php_beast_cache_size)
 {
+#if ZEND_MODULE_API_NO >= 20151012
+
+    char *value = ZSTR_VAL(new_value);
+    int length = ZSTR_LEN(new_value);
+    int retlen;
+
+    if (length == 0) {
+        return FAILURE;
+    }
+
+    beast_atoi(value, &max_cache_size, &retlen);
+
+    if (retlen > 0 && retlen < length) {
+        switch (value[retlen]) {
+        case 'k':
+        case 'K':
+            max_cache_size *= 1024;
+            break;
+        case 'm':
+        case 'M':
+            max_cache_size *= 1024 * 1024;
+            break;
+        case 'g':
+        case 'G':
+            max_cache_size *= 1024 * 1024 * 1024;
+            break;
+        default:
+            return FAILURE;
+        }
+
+    } else if (retlen == 0) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+
+#else
+
     int len;
 
     if (new_value_length == 0) {
@@ -595,15 +633,32 @@ ZEND_INI_MH(php_beast_cache_size)
             return FAILURE;
         }
 
-    } else if (len == 0) { /*failed */
+    } else if (len == 0) {
         return FAILURE;
     }
 
     return SUCCESS;
+
+#endif
 }
 
 ZEND_INI_MH(php_beast_log_file)
 {
+#if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
+        return FAILURE;
+    }
+
+    beast_log_file = estrdup(ZSTR_VAL(new_value));
+    if (beast_log_file == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+
+#else
+
     if (new_value_length == 0) {
         return SUCCESS;
     }
@@ -614,27 +669,65 @@ ZEND_INI_MH(php_beast_log_file)
     }
 
     return SUCCESS;
+
+#endif
 }
 
 
 ZEND_INI_MH(php_beast_enable)
 {
-    if (new_value_length == 0) {
+#if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
         return FAILURE;
     }
 
-    if (!strcasecmp(new_value, "on") || !strcmp(new_value, "1")) {
+    if (!strcasecmp(ZSTR_VAL(new_value), "on")
+        || !strcmp(ZSTR_VAL(new_value), "1"))
+    {
         beast_enable = 1;
     } else {
         beast_enable = 0;
     }
 
     return SUCCESS;
+
+#else
+
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    if (!strcasecmp(new_value, "on")
+        || !strcmp(new_value, "1"))
+    {
+        beast_enable = 1;
+    } else {
+        beast_enable = 0;
+    }
+
+    return SUCCESS;
+#endif
 }
 
 
 ZEND_INI_MH(php_beast_set_networkcard)
 {
+#if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
+        return FAILURE;
+    }
+
+    local_networkcard = estrdup(ZSTR_VAL(new_value));
+    if (local_networkcard == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+
+#else
+
     if (new_value_length == 0) {
         return FAILURE;
     }
@@ -645,22 +738,46 @@ ZEND_INI_MH(php_beast_set_networkcard)
     }
 
     return SUCCESS;
+
+#endif
 }
 
 
 ZEND_INI_MH(php_beast_set_log_normal_file)
 {
-    if (new_value_length == 0) {
+#if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
         return FAILURE;
     }
 
-    if (!strcasecmp(new_value, "on") || !strcmp(new_value, "1")) {
+    if (!strcasecmp(ZSTR_VAL(new_value), "on")
+        || !strcmp(ZSTR_VAL(new_value), "1"))
+    {
         log_normal_file = 1;
     } else {
         log_normal_file = 0;
     }
 
     return SUCCESS;
+
+#else
+
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    if (!strcasecmp(new_value, "on")
+        || !strcmp(new_value, "1"))
+    {
+        log_normal_file = 1;
+    } else {
+        log_normal_file = 0;
+    }
+
+    return SUCCESS;
+
+#endif
 }
 
 
@@ -932,11 +1049,28 @@ PHP_FUNCTION(beast_file_expire)
     char *string;
     char *format = "Y-m-d H:i:s";
 
+#if ZEND_MODULE_API_NO >= 20151012
+
+    zend_string *__file;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S",
+                              &__file TSRMLS_CC) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    file     = ZSTR_VAL(__file);
+    file_len = ZSTR_LEN(__file);
+
+#else
+
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s",
                               &file, &file_len TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
+
+#endif
 
     fd = open(file, O_RDONLY);
     if (fd < 0) {
@@ -982,12 +1116,31 @@ PHP_FUNCTION(beast_encode_file)
     long encrypt_type = BEAST_ENCRYPT_TYPE_DES;
     int ret;
 
+#if ZEND_MODULE_API_NO >= 20151012
+
+    zend_string *in, *out;
+
+    if (zend_parse_parameters(argc TSRMLS_CC, "SS|ll",
+        &in, &out, &expire, &encrypt_type) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    input      = ZSTR_VAL(in);
+    output     = ZSTR_VAL(out);
+    input_len  = ZSTR_LEN(in);
+    output_len = ZSTR_LEN(out);
+
+#else
+
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|ll",
             &input, &input_len, &output, &output_len,
             &expire, &encrypt_type TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
+
+#endif
 
     if (encrypt_type <= 0
         || encrypt_type >= BEAST_ENCRYPT_TYPE_ERROR)
