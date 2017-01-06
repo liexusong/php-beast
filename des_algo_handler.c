@@ -37,6 +37,8 @@ int des_encrypt_handler(char *inbuf, int len,
 
     out = malloc(retlen);
     if (!out) {
+        beast_write_log(beast_log_error,
+               "Out of memory when allocate `%d' size by encrypt(DES)", retlen);
     	return -1;
     }
 
@@ -79,8 +81,8 @@ int des_decrypt_handler(char *inbuf, int len,
     out = malloc(retlen);
     if (!out) {
         beast_write_log(beast_log_error,
-                 "Out of memory when allocate `%d' size by DES module", retlen);
-    	return -1;
+               "Out of memory when allocate `%d' size by decrypt(DES)", retlen);
+        return -1;
     }
 
     for (i = 0; i < blocks; i++) {
