@@ -29,7 +29,7 @@ int aes_encrypt_handler(char *inbuf, int len,
 	out = malloc(blocks * 16);
 	if (!out) {
 		beast_write_log(beast_log_error,
-          "Out of memory when allocate `%d' size by encrypt(AES)", blocks * 16);
+            "Out of memory when allocate `%d' size by encrypt(AES)", blocks*16);
 		return -1;
 	}
 
@@ -71,7 +71,7 @@ int aes_decrypt_handler(char *inbuf, int len,
 	out = malloc(blocks * 16);
 	if (!out) {
 		beast_write_log(beast_log_error,
-          "Out of memory when allocate `%d' size by decrypt(AES)", blocks * 16);
+            "Out of memory when allocate `%d' size by decrypt(AES)", blocks*16);
 		return -1;
 	}
 
