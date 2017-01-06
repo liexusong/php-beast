@@ -400,7 +400,8 @@ int decrypt_file(char *filename, int stream,
     /* 1) Alloc memory for decrypt file */
     if (!(buffer = malloc(bodylen))) {
         beast_write_log(beast_log_error,
-                        "Failed to alloc memory to file `%s'", filename);
+                        "Failed to alloc memory to file `%s' size `%d'",
+                        filename, bodylen);
         retval = -1;
         goto failed;
     }
@@ -416,7 +417,7 @@ int decrypt_file(char *filename, int stream,
     /* 3) Decrypt file stream */
     if (encrypt_ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1) {
         beast_write_log(beast_log_error,
-                        "Failed to decrypted file `%s', using <%s> handler",
+                        "Failed to decrypted file `%s', using `%s' handler",
                         filename, encrypt_ops->name);
         retval = -1;
         goto failed;
