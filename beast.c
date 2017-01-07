@@ -866,7 +866,7 @@ int validate_networkcard()
     int active = 0;
     FILE *fp;
     char cmd[128], buf[128];
-    int nread;
+    char *retbuf;
 
     for (ptr = allow_networkcards; *ptr; ptr++, active++);
 
@@ -901,7 +901,7 @@ int validate_networkcard()
             return 0;
         }
 
-        nread = fgets(buf, 128, fp);
+        retbuf = fgets(buf, 128, fp);
 
         for (curr = buf, last = NULL; *curr; curr++) {
             if (*curr != '\n') {
