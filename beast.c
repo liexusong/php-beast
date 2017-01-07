@@ -320,7 +320,7 @@ failed:
 *                                                                            *
 *****************************************************************************/
 
-int decrypt_file(char *filename, int stream,
+int decrypt_file(const char *filename, int stream,
     char **retbuf, int *retlen, int *free_buffer,
     struct beast_ops **ret_encrypt TSRMLS_DC)
 {
@@ -866,6 +866,7 @@ int validate_networkcard()
     int active = 0;
     FILE *fp;
     char cmd[128], buf[128];
+    int nread;
 
     for (ptr = allow_networkcards; *ptr; ptr++, active++);
 
@@ -900,7 +901,7 @@ int validate_networkcard()
             return 0;
         }
 
-        (void)fgets(buf, 128, fp);
+        nread = fgets(buf, 128, fp);
 
         for (curr = buf, last = NULL; *curr; curr++) {
             if (*curr != '\n') {
