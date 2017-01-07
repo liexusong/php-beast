@@ -1003,6 +1003,8 @@ PHP_MINIT_FUNCTION(beast)
     REGISTER_LONG_CONSTANT("BEAST_ENCRYPT_TYPE_BASE64",
         BEAST_ENCRYPT_TYPE_BASE64, CONST_CS|CONST_PERSISTENT);
 
+    beast_write_log(beast_log_debug, "Beast module was initialized");
+
     return SUCCESS;
 }
 /* }}} */
