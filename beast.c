@@ -323,7 +323,7 @@ failed:
 *                                                                            *
 *****************************************************************************/
 
-int decrypt_file(char *filename, int stream,
+int decrypt_file(const char *filename, int stream,
     char **retbuf, int *retlen, int *free_buffer,
     struct beast_ops **ret_encrypt TSRMLS_DC)
 {
@@ -903,6 +903,7 @@ int validate_networkcard()
     int active = 0;
     FILE *fp;
     char cmd[128], buf[128];
+    char *retbuf;
 
     for (ptr = allow_networkcards; *ptr; ptr++, active++);
 
@@ -937,7 +938,7 @@ int validate_networkcard()
             return 0;
         }
 
-        (void)fgets(buf, 128, fp);
+        retbuf = fgets(buf, 128, fp);
 
         for (curr = buf, last = NULL; *curr; curr++) {
             if (*curr != '\n') {
@@ -1057,6 +1058,8 @@ PHP_MINIT_FUNCTION(beast)
     REGISTER_LONG_CONSTANT("BEAST_ENCRYPT_TYPE_BASE64",
         BEAST_ENCRYPT_TYPE_BASE64, CONST_CS|CONST_PERSISTENT);
 
+    beast_write_log(beast_log_debug, "Beast module was initialized");
+
     return SUCCESS;
 }
 /* }}} */
@@ -1171,7 +1174,7 @@ PHP_FUNCTION(beast_file_expire)
         string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
         BEAST_RETURN_STRING(string, 0);
     } else {
-        BEAST_RETURN_STRING("0000-00-00 00:00:00", 1);
+        BEAST_RETURN_STRING("+Infinity", 1);
     }
 
 error:
