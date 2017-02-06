@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include "main/php_reentrancy.h"
 #include "beast_log.h"
 
@@ -18,6 +19,20 @@ int beast_log_init(char *log_file)
     if (!beast_log_fp)
         return -1;
     return 0;
+}
+
+
+int beast_log_chown(uid_t uid, gid_t gid)
+{
+    int fd;
+
+    if (!beast_log_fp) {
+        return 0;
+    }
+
+    fd = fileno(beast_log_fp);
+
+    return fchown(fd, uid, gid);
 }
 
 

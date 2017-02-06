@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <time.h>
+#include <pwd.h>
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
@@ -71,7 +72,9 @@ extern struct beast_ops *ops_handler_list[];
  * Global vaiables for extension
  */
 char *beast_log_file = NULL;
+char *beast_log_user = NULL;
 int beast_ncpu = 1;
+int beast_is_root = 0;
 
 /* True global resources - no need for thread safety here */
 static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
@@ -668,7 +671,7 @@ ZEND_INI_MH(php_beast_log_file)
 #if ZEND_MODULE_API_NO >= 20151012
 
     if (ZSTR_LEN(new_value) == 0) {
-        return FAILURE;
+        return SUCCESS;
     }
 
     beast_log_file = estrdup(ZSTR_VAL(new_value));
@@ -686,6 +689,38 @@ ZEND_INI_MH(php_beast_log_file)
 
     beast_log_file = strdup(new_value);
     if (beast_log_file == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+
+#endif
+}
+
+
+ZEND_INI_MH(php_beast_log_user)
+{
+#if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
+        return SUCCESS;
+    }
+
+    beast_log_user = estrdup(ZSTR_VAL(new_value));
+    if (beast_log_user == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+
+#else
+
+    if (new_value_length == 0) {
+        return SUCCESS;
+    }
+
+    beast_log_user = strdup(new_value);
+    if (beast_log_user == NULL) {
         return FAILURE;
     }
 
@@ -807,6 +842,8 @@ PHP_INI_BEGIN()
           php_beast_cache_size)
     PHP_INI_ENTRY("beast.log_file", "/tmp/beast.log", PHP_INI_ALL,
           php_beast_log_file)
+    PHP_INI_ENTRY("beast.log_user", "root", PHP_INI_ALL,
+          php_beast_log_user)
     PHP_INI_ENTRY("beast.enable", "1", PHP_INI_ALL,
           php_beast_enable)
     PHP_INI_ENTRY("beast.networkcard", "eth0", PHP_INI_ALL,
@@ -984,6 +1021,23 @@ PHP_MINIT_FUNCTION(beast)
         php_error_docref(NULL TSRMLS_CC,
                          E_ERROR, "Unable open log file for beast");
         return FAILURE;
+    }
+
+    if (getuid() == 0 && beast_log_user) {
+        struct passwd *pwd;
+
+        pwd = getpwnam((const char *)beast_log_user);
+        if (!pwd) {
+            php_error_docref(NULL TSRMLS_CC,
+                             E_ERROR, "Unable get user passwd information");
+            return FAILURE;
+        }
+
+        if (beast_log_chown(pwd->pw_uid, pwd->pw_gid) != 0) {
+            php_error_docref(NULL TSRMLS_CC,
+                             E_ERROR, "Unable change log file owner");
+            return FAILURE;
+        }
     }
 
     old_compile_file = zend_compile_file;
