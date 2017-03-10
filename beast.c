@@ -400,6 +400,16 @@ int decrypt_file(const char *filename, int stream,
         entype  = swab32(entype);
     }
 
+    /* Check file size is vaild */
+    if (reallen > beast_max_filesize) {
+        beast_write_log(beast_log_error,
+                        "File size `%d' out of max size `%d'",
+                        reallen, beast_max_filesize);
+        retval = -1;
+        goto failed;
+    }
+
+    /* Check file is not expired */
     if (expire > 0 && expire < beast_now_time) {
         beast_write_log(beast_log_error, "File `%s' was expired", filename);
         retval = -2;
@@ -509,7 +519,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
                           &free_buffer, &ops TSRMLS_CC);
     if (retval == -2) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                      "This program was expired, please contact administrator");
+            "This program was expired, please contact administrator");
         return NULL;
     }
 
@@ -1024,7 +1034,7 @@ PHP_MINIT_FUNCTION(beast)
         return FAILURE;
     }
 
-    if (getuid() == 0 && beast_log_user) {
+    if (getuid() == 0 && beast_log_user) { /* Change log file owner user */
         struct passwd *pwd;
 
         pwd = getpwnam((const char *)beast_log_user);
