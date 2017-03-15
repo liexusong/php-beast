@@ -81,8 +81,6 @@ static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
 
 static int le_beast;
 static int max_cache_size = DEFAULT_CACHE_SIZE;
-static int cache_hits = 0;
-static int cache_miss = 0;
 static int beast_enable = 1;
 static int beast_max_filesize = 0;
 static char *local_networkcard = NULL;
@@ -96,7 +94,6 @@ static int log_normal_file = 0;
 zend_function_entry beast_functions[] = {
     PHP_FE(beast_encode_file,      NULL)
     PHP_FE(beast_avail_cache,      NULL)
-    PHP_FE(beast_cache_info,       NULL)
     PHP_FE(beast_support_filesize, NULL)
     PHP_FE(beast_file_expire,      NULL)
     {NULL, NULL, NULL}    /* Must be the last line in beast_functions[] */
@@ -354,10 +351,9 @@ int decrypt_file(const char *filename, int stream,
 
     cache = beast_cache_find(&findkey);
 
-    if (cache != NULL) { /* found!!! */
+    if (cache != NULL) { /* Found cache */
         *retbuf = beast_cache_data(cache);
         *retlen = beast_cache_size(cache);
-        cache_hits++;
         return 0;
     }
 
@@ -378,8 +374,10 @@ int decrypt_file(const char *filename, int stream,
     }
 
     /* Not a encrypted file */
-    if (memcmp(header, encrypt_file_header_sign, encrypt_file_header_length)) {
-
+    if (memcmp(header,
+               encrypt_file_header_sign,
+               encrypt_file_header_length))
+    {
         if (log_normal_file) {
             beast_write_log(beast_log_error,
                             "File `%s' isn't a encrypted file", filename);
@@ -475,8 +473,6 @@ int decrypt_file(const char *filename, int stream,
         *retlen = reallen;
         *free_buffer = 1;
     }
-
-    cache_miss++;
 
     return 0;
 
@@ -850,7 +846,7 @@ ZEND_INI_MH(php_beast_set_log_normal_file)
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "10485760", PHP_INI_ALL,
           php_beast_cache_size)
-    PHP_INI_ENTRY("beast.log_file", "/tmp/beast.log", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.log_file", "/tmp/php-beast.log", PHP_INI_ALL,
           php_beast_log_file)
     PHP_INI_ENTRY("beast.log_user", "root", PHP_INI_ALL,
           php_beast_log_user)
@@ -1249,15 +1245,6 @@ PHP_FUNCTION(beast_encode_file)
 PHP_FUNCTION(beast_avail_cache)
 {
     RETURN_LONG(beast_mm_availspace());
-}
-
-
-PHP_FUNCTION(beast_cache_info)
-{
-    array_init(return_value);
-    beast_cache_info(return_value);
-    add_assoc_long(return_value, "cache_hits", cache_hits);
-    add_assoc_long(return_value, "cache_miss", cache_miss);
 }
 
 
