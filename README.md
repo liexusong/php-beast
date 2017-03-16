@@ -60,6 +60,8 @@ $ sudo make && make install
 ------------------------------
 
 ## 怎么加密项目
+**加密方案1**
+
 安装完 `php-beast` 后可以使用 `tools` 目录下的 `encode_files.php` 来加密你的项目。使用 `encode_files.php` 之前先修改 `tools` 目录下的 `configure.ini` 文件，如下：
 ```ini
 ; source path
@@ -76,6 +78,17 @@ encrypt_type = "DES"
 ```
 `src_path` 是要加密项目的路径，`dst_path` 是保存加密后项目的路径，`expire` 是设置项目可使用的时间 (`expire` 的格式是：`YYYY-mm-dd HH:ii:ss`)。`encrypt_type`是加密的方式，选择项有：DES、AES、BASE64。
 修改完 `configure.ini` 文件后就可以使用命令 `php encode_files.php` 开始加密项目。
+
+**加密方案2**
+
+使用`beast_encode_file()`函数加密文件，函数原型如下：<br/>
+`beast_encode_file(string $input_file, string $output_file, int expire_timestamp, int encrypt_type)`。
+<pre>
+1. $input_file: 要加密的文件
+2. $output_file: 输出的加密文件路径
+3. $expire_timestamp: 文件过期时间戳
+4. $encrypt_type: 加密使用的算法（支持：BEAST_ENCRYPT_TYPE_DES、BEAST_ENCRYPT_TYPE_AES）
+</pre>
 
 ------------------------------
 
