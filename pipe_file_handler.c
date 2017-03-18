@@ -1,5 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include "file_handler.h"
 
 struct pipe_handler_ctx {
@@ -61,7 +64,7 @@ int pipe_handler_open(struct file_handler *self)
 
 int pipe_handler_write(struct file_handler *self, char *buf, int size)
 {
-    struct tmpfile_handler_ctx *ctx = self->ctx;
+    struct pipe_handler_ctx *ctx = self->ctx;
 
     if (write(ctx->fd[1], buf, size) == size) {
         return 0;
@@ -82,7 +85,7 @@ FILE *pipe_handler_get_fp(struct file_handler *self)
 
 int pipe_handler_get_fd(struct file_handler *self)
 {
-    struct tmpfile_handler_ctx *ctx = self->ctx;
+    struct pipe_handler_ctx *ctx = self->ctx;
     int fd = ctx->fd[0];
 
     close(ctx->fd[1]);
@@ -93,7 +96,7 @@ int pipe_handler_get_fd(struct file_handler *self)
 
 int pipe_handler_destroy(struct file_handler *self)
 {
-    struct tmpfile_handler_ctx *ctx = self->ctx;
+    struct pipe_handler_ctx *ctx = self->ctx;
 
     if (!ctx) {
         return 0;
