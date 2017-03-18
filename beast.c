@@ -410,7 +410,7 @@ int decrypt_file(const char *filename, int stream,
     }
 
     /* Check file size is vaild */
-    if (reallen > beast_max_filesize) {
+    if (beast_max_filesize > 0 && reallen > beast_max_filesize) {
         beast_write_log(beast_log_error,
                         "File size `%d' out of max size `%d'",
                         reallen, beast_max_filesize);
