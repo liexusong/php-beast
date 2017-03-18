@@ -60,6 +60,8 @@ int pipe_handler_get_fd(struct file_handler *self)
     close(ctx->fd[1]);
     free(self->ctx);
 
+    self->ctx = NULL;
+
     return fd;
 }
 
@@ -77,12 +79,15 @@ int pipe_handler_destroy(struct file_handler *self)
         close(ctx->fd[1]);
     free(self->ctx);
 
+    self->ctx = NULL;
+
     return 0;
 }
 
 
 struct file_handler pipe_handler = {
     .name    = "pipe",
+    .ctx     = NULL,
     .check   = pipe_handler_check,
     .open    = pipe_handler_open,
     .write   = pipe_handler_write,

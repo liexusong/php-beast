@@ -59,6 +59,8 @@ FILE *tmpfile_handler_get_fp(struct file_handler *self)
 
     free(self->ctx);
 
+    self->ctx = NULL;
+
     return fp;
 }
 
@@ -79,12 +81,15 @@ int tmpfile_handler_destroy(struct file_handler *self)
         fclose(ctx->fp);
     free(self->ctx);
 
+    self->ctx = NULL;
+
     return 0;
 }
 
 
 struct file_handler tmpfile_handler = {
     .name    = "tmpfile",
+    .ctx     = NULL,
     .check   = tmpfile_handler_check,
     .open    = tmpfile_handler_open,
     .write   = tmpfile_handler_write,
