@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "php_beast.h"
+#include "file_handler.h"
 
 struct pipe_handler_ctx {
     int fd[2];

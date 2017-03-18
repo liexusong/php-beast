@@ -53,6 +53,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "cache.h"
 #include "beast_log.h"
 #include "beast_module.h"
+#include "file_handler.h"
 
 #if ZEND_MODULE_API_NO >= 20151012
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
