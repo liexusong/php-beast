@@ -27,7 +27,7 @@ int pipe_handler_check()
     int max = 0;
 
     if (pipe(fd) != 0 || set_nonblock(fd[1]) != 0) {
-        return FAILURE;
+        return -1;
     }
 
     for (;;) {

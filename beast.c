@@ -1016,6 +1016,9 @@ PHP_MINIT_FUNCTION(beast)
     }
 
     beast_max_filesize = default_file_handler->check();
+    if (beast_max_filesize == -1) {
+        return FAILURE;
+    }
 
     if (beast_cache_init(max_cache_size) == -1) {
         php_error_docref(NULL TSRMLS_CC,
