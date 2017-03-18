@@ -124,8 +124,8 @@ zend_module_entry beast_module_entry = {
 ZEND_GET_MODULE(beast)
 #endif
 
-extern struct file_handler *tmpfile_handler;
-extern struct file_handler *pipe_handler;
+extern struct file_handler tmpfile_handler;
+extern struct file_handler pipe_handler;
 
 static struct file_handler *default_file_handler = NULL;
 static struct file_handler *file_handlers[] = {
@@ -547,11 +547,11 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     switch (default_file_handler->type) {
     case BEAST_FILE_HANDLER_FP:
         h->type = ZEND_HANDLE_FP;
-        h->handle.fp = default_file_handler->get_fp();
+        h->handle.fp = default_file_handler->get_fp(default_file_handler);
         break;
     case BEAST_FILE_HANDLER_FD:
         h->type = ZEND_HANDLE_FD;
-        h->handle.fd = default_file_handler->get_fd();
+        h->handle.fd = default_file_handler->get_fd(default_file_handler);
         break;
     }
 
