@@ -982,7 +982,7 @@ int validate_networkcard()
  */
 PHP_MINIT_FUNCTION(beast)
 {
-    int fds[2];
+    int i;
 
     /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
@@ -1004,12 +1004,13 @@ PHP_MINIT_FUNCTION(beast)
     }
 
     /* Check module support the max file size */
-    default_file_handler = file_handlers[0];
-    while (default_file_handler) {
-        if (!strcasecmp(file_handler_switch, default_file_handler->name)) {
+    for (i = 0; ; i++) {
+        default_file_handler = file_handlers[i];
+        if (!default_file_handler ||
+            !strcasecmp(file_handler_switch, default_file_handler->name))
+        {
             break;
         }
-        default_file_handler = default_file_handler->next;
     }
 
     if (!default_file_handler) {
