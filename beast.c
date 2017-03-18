@@ -1009,6 +1009,7 @@ PHP_MINIT_FUNCTION(beast)
         if (!strcasecmp(file_handler_switch, default_file_handler->name)) {
             break;
         }
+        default_file_handler = default_file_handler->next;
     }
 
     if (!default_file_handler) {
