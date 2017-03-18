@@ -80,13 +80,13 @@ struct file_handler {
     char *name;
     int type;
     void *ctx;
-    int check();
-    int open(struct file_handler *self);
-    int write(struct file_handler *self, char *buf, int size);
-    int rewind(struct file_handler *self);
-    int get_fd(struct file_handler *self);
-    FILE *get_fp(struct file_handler *self);
-    int destroy(struct file_handler *self);
+    int (*check)();
+    int (*open)(struct file_handler *self);
+    int (*write)(struct file_handler *self, char *buf, int size);
+    int (*rewind)(struct file_handler *self);
+    int (*get_fd)(struct file_handler *self);
+    FILE *(*get_fp)(struct file_handler *self);
+    int (*destroy)(struct file_handler *self);
 };
 
 #endif	/* PHP_BEAST_H */
