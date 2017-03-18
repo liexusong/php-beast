@@ -1,45 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include "file_handler.h"
 
 struct pipe_handler_ctx {
     int fd[2];
 };
 
-int set_nonblock(int fd)
-{
-    int flags;
-
-    if ((flags = fcntl(fd, F_GETFL, 0)) == -1
-        || fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-    {
-        return -1;
-    }
-    return 0;
-}
-
 int pipe_handler_check()
 {
-    int fd[2];
-    int max = 0;
-
-    if (pipe(fd) != 0 || set_nonblock(fd[1]) != 0) {
-        return -1;
-    }
-
-    for (;;) {
-        if (write(fd[1], "\0", 1) != 1)
-            break;
-        max++;
-    }
-
-    close(fd[0]);
-    close(fd[1]);
-
-    return max;
+    return 64 * 1024;
 }
 
 int pipe_handler_open(struct file_handler *self)
