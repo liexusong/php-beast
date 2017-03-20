@@ -53,6 +53,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "cache.h"
 #include "beast_log.h"
 #include "beast_module.h"
+#include "file_handler.h"
 
 #if ZEND_MODULE_API_NO >= 20151012
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
@@ -124,9 +125,19 @@ zend_module_entry beast_module_entry = {
 ZEND_GET_MODULE(beast)
 #endif
 
+extern struct file_handler tmpfile_handler;
+extern struct file_handler pipe_handler;
+
+static struct file_handler *default_file_handler = NULL;
+static struct file_handler *file_handlers[] = {
+    &tmpfile_handler,
+    &pipe_handler,
+    NULL
+};
 
 extern char encrypt_file_header_sign[];
 extern int encrypt_file_header_length;
+extern char *file_handler_switch;
 
 #define swab32(x)                                        \
      ((x & 0x000000FF) << 24 | (x & 0x0000FF00) << 8 |   \
@@ -252,7 +263,7 @@ int encrypt_file(const char *inputfile,
 #endif
 
     /* PHP file size can not large than beast_max_filesize */
-    if (inlen > beast_max_filesize) {
+    if (beast_max_filesize > 0 && inlen > beast_max_filesize) {
         return -1;
     }
 
@@ -399,7 +410,7 @@ int decrypt_file(const char *filename, int stream,
     }
 
     /* Check file size is vaild */
-    if (reallen > beast_max_filesize) {
+    if (beast_max_filesize > 0 && reallen > beast_max_filesize) {
         beast_write_log(beast_log_error,
                         "File size `%d' out of max size `%d'",
                         reallen, beast_max_filesize);
@@ -496,13 +507,13 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 #else
     char *opened_path;
 #endif
-    char *buffer;
+    char *buf;
     int fd;
     FILE *filep = NULL;
-    int size, free_buffer = 0, destroy_read_shadow = 1;
-    int shadow[2]= {0, 0};
+    int size, free_buffer = 0;
     int retval;
     struct beast_ops *ops = NULL;
+    int destroy_file_handler = 0;
 
     filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
      if (filep != NULL) {
@@ -511,7 +522,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         goto final;
      }
 
-    retval = decrypt_file(h->filename, fd, &buffer, &size,
+    retval = decrypt_file(h->filename, fd, &buf, &size,
                           &free_buffer, &ops TSRMLS_CC);
     if (retval == -2) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
@@ -519,31 +530,36 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         return NULL;
     }
 
-    if (retval == -1 || pipe(shadow) != 0) {
-        goto final;
-    }
-
-    /* write data to shadow file */
-    if (write(shadow[1], buffer, size) != size) {
+    if (retval == -1 ||
+        default_file_handler->open(default_file_handler) == -1 ||
+        default_file_handler->write(default_file_handler, buf, size) == -1 ||
+        default_file_handler->rewind(default_file_handler) == -1)
+    {
+        destroy_file_handler = 1;
         goto final;
     }
 
     if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
     if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
 
-    h->type = ZEND_HANDLE_FD;
-    h->handle.fd = shadow[0];
-
-    /**
-     * zend_compile_file() function would using this file,
-     * so don't destroy it.
+    /*
+     * Get file handler and free context
      */
-    destroy_read_shadow = 0;
+    switch (default_file_handler->type) {
+    case BEAST_FILE_HANDLER_FP:
+        h->type = ZEND_HANDLE_FP;
+        h->handle.fp = default_file_handler->get_fp(default_file_handler);
+        break;
+    case BEAST_FILE_HANDLER_FD:
+        h->type = ZEND_HANDLE_FD;
+        h->handle.fd = default_file_handler->get_fd(default_file_handler);
+        break;
+    }
 
 final:
     if (free_buffer && ops) {
         if (ops->free) {
-            ops->free(buffer);
+            ops->free(buf);
         }
     }
 
@@ -551,12 +567,8 @@ final:
         fclose(filep);
     }
 
-    if (shadow[1]) {
-        close(shadow[1]);
-    }
-
-    if (destroy_read_shadow && shadow[0]) {
-        close(shadow[0]);
+    if (destroy_file_handler) {
+        default_file_handler->destroy(default_file_handler);
     }
 
     return old_compile_file(h, type TSRMLS_CC);
@@ -861,19 +873,6 @@ PHP_INI_END()
 /* }}} */
 
 
-int set_nonblock(int fd)
-{
-    int flags;
-
-    if ((flags = fcntl(fd, F_GETFL, 0)) == -1
-        || fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-    {
-        return -1;
-    }
-    return 0;
-}
-
-
 void segmentfault_deadlock_fix(int sig)
 {
     void *array[10] = {0};
@@ -983,7 +982,7 @@ int validate_networkcard()
  */
 PHP_MINIT_FUNCTION(beast)
 {
-    int fds[2];
+    int i;
 
     /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
@@ -1005,18 +1004,23 @@ PHP_MINIT_FUNCTION(beast)
     }
 
     /* Check module support the max file size */
-    if (pipe(fds) != 0 || set_nonblock(fds[1]) != 0) {
+    for (i = 0; ; i++) {
+        default_file_handler = file_handlers[i];
+        if (!default_file_handler ||
+            !strcasecmp(file_handler_switch, default_file_handler->name))
+        {
+            break;
+        }
+    }
+
+    if (!default_file_handler) {
         return FAILURE;
     }
 
-    for (;;) {
-        if (write(fds[1], "\0", 1) != 1)
-            break;
-        beast_max_filesize++;
+    beast_max_filesize = default_file_handler->check();
+    if (beast_max_filesize == -1) {
+        return FAILURE;
     }
-
-    close(fds[0]);
-    close(fds[1]);
 
     if (beast_cache_init(max_cache_size) == -1) {
         php_error_docref(NULL TSRMLS_CC,
