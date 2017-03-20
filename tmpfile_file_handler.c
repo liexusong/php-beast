@@ -73,7 +73,7 @@ int tmpfile_handler_destroy(struct file_handler *self)
 }
 
 static struct tmpfile_handler_ctx _ctx = {
-    .fp = NULL;
+    .fp = NULL
 };
 
 struct file_handler tmpfile_handler = {
