@@ -13,20 +13,13 @@ int pipe_handler_check()
 
 int pipe_handler_open(struct file_handler *self)
 {
-    struct pipe_handler_ctx *ctx;
-
-    ctx = malloc(sizeof(*ctx));
-    if (!ctx) {
-        return -1;
-    }
+    struct pipe_handler_ctx *ctx = self->ctx;
 
     if (pipe(ctx->fd) == -1) {
-        free(ctx);
+        ctx->fd[0] = -1;
+        ctx->fd[1] = -1;
         return -1;
     }
-
-    self->type = BEAST_FILE_HANDLER_FD;
-    self->ctx = ctx;
 
     return 0;
 }
@@ -55,39 +48,41 @@ FILE *pipe_handler_get_fp(struct file_handler *self)
 int pipe_handler_get_fd(struct file_handler *self)
 {
     struct pipe_handler_ctx *ctx = self->ctx;
-    int fd = ctx->fd[0];
+    int retval;
 
-    close(ctx->fd[1]);
-    free(self->ctx);
+    retval = ctx->fd[0];
 
-    self->ctx = NULL;
+    close(ctx->fd[1]);  /* Closed write pipe */
 
-    return fd;
+    ctx->fd[0] = -1;
+    ctx->fd[1] = -1;
+
+    return retval;
 }
 
 int pipe_handler_destroy(struct file_handler *self)
 {
     struct pipe_handler_ctx *ctx = self->ctx;
 
-    if (!ctx) {
-        return 0;
-    }
-
     if (ctx->fd[0] != -1)
         close(ctx->fd[0]);
     if (ctx->fd[1] != -1)
         close(ctx->fd[1]);
-    free(self->ctx);
 
-    self->ctx = NULL;
+    ctx->fd[0] = -1;
+    ctx->fd[1] = -1;
 
     return 0;
 }
 
+static struct pipe_handler_ctx _ctx = {
+    .fd = {-1, -1}
+};
 
 struct file_handler pipe_handler = {
     .name    = "pipe",
-    .ctx     = NULL,
+    .type    = BEAST_FILE_HANDLER_FD,
+    .ctx     = &_ctx,
     .check   = pipe_handler_check,
     .open    = pipe_handler_open,
     .write   = pipe_handler_write,

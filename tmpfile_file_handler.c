@@ -13,21 +13,12 @@ int tmpfile_handler_check()
 
 int tmpfile_handler_open(struct file_handler *self)
 {
-    struct tmpfile_handler_ctx *ctx;
-
-    ctx = malloc(sizeof(*ctx));
-    if (!ctx) {
-        return -1;
-    }
+    struct tmpfile_handler_ctx *ctx = self->ctx;
 
     ctx->fp = tmpfile();
     if (!ctx->fp) {
-        free(ctx);
         return -1;
     }
-
-    self->type = BEAST_FILE_HANDLER_FP;
-    self->ctx = ctx;
 
     return 0;
 }
@@ -55,13 +46,12 @@ int tmpfile_handler_rewind(struct file_handler *self)
 FILE *tmpfile_handler_get_fp(struct file_handler *self)
 {
     struct tmpfile_handler_ctx *ctx = self->ctx;
-    FILE *fp = ctx->fp;
+    FILE *retval;
 
-    free(self->ctx);
+    retval = ctx->fp;
+    ctx->fp = NULL;
 
-    self->ctx = NULL;
-
-    return fp;
+    return retval;
 }
 
 int tmpfile_handler_get_fd(struct file_handler *self)
@@ -73,23 +63,23 @@ int tmpfile_handler_destroy(struct file_handler *self)
 {
     struct tmpfile_handler_ctx *ctx = self->ctx;
 
-    if (!ctx) {
-        return 0;
+    if (ctx->fp) {
+        fclose(ctx->fp);
     }
 
-    if (ctx->fp)
-        fclose(ctx->fp);
-    free(self->ctx);
-
-    self->ctx = NULL;
+    ctx->fp = NULL;
 
     return 0;
 }
 
+static struct tmpfile_handler_ctx _ctx = {
+    .fp = NULL;
+};
 
 struct file_handler tmpfile_handler = {
     .name    = "tmpfile",
-    .ctx     = NULL,
+    .type    = BEAST_FILE_HANDLER_FP,
+    .ctx     = &_ctx,
     .check   = tmpfile_handler_check,
     .open    = tmpfile_handler_open,
     .write   = tmpfile_handler_write,
