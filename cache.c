@@ -18,7 +18,9 @@
 
 #include <stdlib.h>
 #include <sys/types.h>
+#ifndef PHP_WIN32
 #include <sys/mman.h>
+#endif
 
 #include "beast_mm.h"
 #include "spinlock.h"
@@ -77,12 +79,28 @@ int beast_cache_init(int size)
     }
 
     /* init cache lock */
+#ifdef PHP_WIN32
+	cache_lock = NULL;
+	HANDLE hLockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+		NULL, PAGE_READWRITE, 0, sizeof(int), NULL);
+	if (hLockMapFile) {
+		cache_lock = MapViewOfFile(
+			hLockMapFile,
+			FILE_MAP_ALL_ACCESS,
+			0,
+			0,
+			sizeof(int)
+		);
+		CloseHandle(hLockMapFile);
+	}
+#else
     cache_lock = (int *)mmap(NULL,
                              sizeof(int),
                              PROT_READ|PROT_WRITE,
                              MAP_SHARED|MAP_ANON,
                              -1,
                              0);
+#endif
     if (!cache_lock) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for cache lock");
@@ -95,16 +113,36 @@ int beast_cache_init(int size)
     /* init cache buckets's memory */
     bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
 
+#ifdef PHP_WIN32
+	HANDLE hBucketsMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+		NULL, PAGE_READWRITE, 0, bucket_size, NULL);
+	if (hBucketsMapFile) {
+		beast_cache_buckets = (cache_item_t **)MapViewOfFile(
+			hBucketsMapFile, 
+			FILE_MAP_ALL_ACCESS,
+			0,
+			0,
+			bucket_size
+		);
+		CloseHandle(hBucketsMapFile);
+	}
+#else
     beast_cache_buckets = (cache_item_t **)mmap(NULL,
                                                 bucket_size,
                                                 PROT_READ|PROT_WRITE,
                                                 MAP_SHARED|MAP_ANON,
                                                 -1,
                                                 0);
+#endif
+
     if (!beast_cache_buckets) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for cache buckets");
-        munmap((void *)cache_lock, sizeof(int));
+#ifdef PHP_WIN32
+		UnmapViewOfFile(cache_lock);
+#else
+		munmap((void *)cache_lock, sizeof(int));
+#endif
         beast_mm_destroy();
         return -1;
     }
@@ -228,11 +266,15 @@ int beast_cache_destroy()
     beast_mm_destroy(); /* destroy memory manager */
 
     /* free cache buckets's mmap memory */
+#ifdef PHP_WIN32
+	UnmapViewOfFile((void *)cache_lock);
+	UnmapViewOfFile((void *)beast_cache_buckets);
+#else
     munmap((void *)beast_cache_buckets,
            sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
 
     munmap((void *)cache_lock, sizeof(int));
-
+#endif
     beast_cache_initialization = 0;
 
     return 0;

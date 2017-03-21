@@ -1,7 +1,11 @@
 #ifndef BEAST_LOG_H
 #define BEAST_LOG_H
 
+#ifdef PHP_WIN32
+#include "win95nt.h"
+#else
 #include <unistd.h>
+#endif
 
 typedef enum {
     beast_log_debug,  /* 0 */

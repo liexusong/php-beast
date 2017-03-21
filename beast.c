@@ -24,11 +24,15 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <time.h>
-#include <pwd.h>
+
+#ifdef PHP_WIN32
+#else
+	#include <pwd.h>
+	#include <unistd.h>
+#endif
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
@@ -131,7 +135,9 @@ extern struct file_handler pipe_handler;
 static struct file_handler *default_file_handler = NULL;
 static struct file_handler *file_handlers[] = {
     &tmpfile_handler,
+#ifndef PHP_WIN32
     &pipe_handler,
+#endif
     NULL
 };
 
@@ -875,6 +881,9 @@ PHP_INI_END()
 
 void segmentfault_deadlock_fix(int sig)
 {
+#ifdef PHP_WIN32 // windows not support backtrace
+	beast_write_log(beast_log_error, "Segmentation fault and fix deadlock");
+#else
     void *array[10] = {0};
     size_t size;
     char **info = NULL;
@@ -891,7 +900,7 @@ void segmentfault_deadlock_fix(int sig)
         }
         free(info);
     }
-
+#endif
     beast_mm_unlock();     /* Maybe lock mm so free here */
     beast_cache_unlock();  /* Maybe lock cache so free here */
 
@@ -1034,6 +1043,7 @@ PHP_MINIT_FUNCTION(beast)
         return FAILURE;
     }
 
+#ifndef PHP_WIN32
     if (getuid() == 0 && beast_log_user) { /* Change log file owner user */
         struct passwd *pwd;
 
@@ -1050,11 +1060,17 @@ PHP_MINIT_FUNCTION(beast)
             return FAILURE;
         }
     }
+#endif
 
     old_compile_file = zend_compile_file;
     zend_compile_file = cgi_compile_file;
-
-    beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
+#ifdef PHP_WIN32
+	SYSTEM_INFO info;
+	GetSystemInfo(&info);
+	beast_ncpu = info.dwNumberOfProcessors;
+#else
+	beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
+#endif
     if (beast_ncpu <= 0) {
         beast_ncpu = 1;
     }

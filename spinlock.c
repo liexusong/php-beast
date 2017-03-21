@@ -17,9 +17,16 @@
 */
 
 #include <stdlib.h>
-#include <pthread.h>
 #include "spinlock.h"
-
+#ifdef PHP_WIN32
+#include <Windows.h>
+#define __sync_bool_compare_and_swap(lock, o, n) (o == InterlockedExchange(lock, n))
+#define __asm__(c) __asm { pause }
+#define sched_yield() __asm { rep nop } 
+#else
+#include <pthread.h>
+#endif
+#include "beast_log.h"
 
 extern int beast_ncpu;
 
@@ -27,7 +34,6 @@ extern int beast_ncpu;
 void beast_spinlock(beast_atomic_t *lock, int pid)
 {
     int i, n;
-
     for ( ;; ) {
 
         if (*lock == 0 && 

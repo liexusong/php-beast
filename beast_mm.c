@@ -9,7 +9,11 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#ifdef PHP_WIN32
+#include <Windows.h>
+#else
 #include <sys/mman.h>
+#endif
 
 #include "spinlock.h"
 #include "beast_log.h"
@@ -216,12 +220,28 @@ int beast_mm_init(int block_size)
     }
 
     /* init memory manager lock */
+#ifdef PHP_WIN32
+	mm_lock = NULL;
+	HANDLE hLockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+		NULL, PAGE_READWRITE, 0, sizeof(int), NULL);
+	if (hLockMapFile) {
+		mm_lock = MapViewOfFile(
+			hLockMapFile,
+			FILE_MAP_ALL_ACCESS,
+			0,
+			0,
+			sizeof(int)
+		);
+		CloseHandle(hLockMapFile);
+}
+#else
     mm_lock = (int *)mmap(NULL,
                           sizeof(int),
                           PROT_READ|PROT_WRITE,
                           MAP_SHARED|MAP_ANON,
                           -1,
                           0);
+#endif
     if (!mm_lock) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for memory manager lock");
@@ -236,16 +256,35 @@ int beast_mm_init(int block_size)
         beast_mm_block_size = block_size;
     }
 
+#ifdef PHP_WIN32
+	HANDLE hBlockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+		NULL, PAGE_READWRITE, 0, beast_mm_block_size, NULL);
+	if (hBlockMapFile) {
+		shmaddr = beast_mm_block = MapViewOfFile(
+			hBlockMapFile,
+			FILE_MAP_ALL_ACCESS,
+			0,
+			0,
+			beast_mm_block_size
+		);
+		CloseHandle(hBlockMapFile);
+	}
+#else
     shmaddr = beast_mm_block = (void *)mmap(NULL,
                                             beast_mm_block_size,
                                             PROT_READ|PROT_WRITE,
                                             MAP_SHARED|MAP_ANON,
                                             -1,
                                             0);
+#endif
     if (!beast_mm_block) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for beast");
+#ifdef PHP_WIN32
+		UnmapViewOfFile(mm_lock);
+#else
         munmap((void *)mm_lock, sizeof(int));
+#endif
         return -1;
     }
 
@@ -388,10 +427,15 @@ int beast_mm_realspace()
 void beast_mm_destroy()
 {
     if (beast_mm_initialized) {
+#ifdef PHP_WIN32
+		UnmapViewOfFile(beast_mm_block);
+		UnmapViewOfFile(mm_lock);
+#else
         /* Free cache memory */
         munmap((void *)beast_mm_block, beast_mm_block_size);
         /* Free memory lock */
         munmap((void *)mm_lock, sizeof(int));
+#endif
         beast_mm_initialized = 0;
     }
 }
