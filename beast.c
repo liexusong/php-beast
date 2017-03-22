@@ -12,7 +12,8 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author: Liexusong <280259971@qq.com>                                 |
+  | Author: Liexusong <liexusong@qq.com>                                 |
+  |         maben <www.maben@foxmail.com>                                |
   +----------------------------------------------------------------------+
 */
 
