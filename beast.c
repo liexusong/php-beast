@@ -526,7 +526,6 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     int destroy_file_handler = 0;
 
 	filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
-	//filep = fopen(h->filename, "rb");
      if (filep != NULL) {
          fd = fileno(filep);
      } else {
@@ -921,7 +920,7 @@ static char *get_mac_address(char *networkcard)
 	ULONG size = sizeof(IP_ADAPTER_INFO);
 	int ret, i;
 	char *address = NULL;
-	char buf[128] = { 0 }, tmp[3];
+	char buf[128] = { 0 }, *pos;
 
 	PIP_ADAPTER_INFO pCurrentAdapter = NULL;
 	PIP_ADAPTER_INFO pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(sizeof(*pIpAdapterInfo));
@@ -948,16 +947,10 @@ static char *get_mac_address(char *networkcard)
 	pCurrentAdapter = pIpAdapterInfo;
 	do {
 		if (strcmp(pCurrentAdapter->AdapterName, networkcard) == 0) {
-			for (i = 0; i < pCurrentAdapter->AddressLength; i++) {
-				memset(tmp, 0, sizeof(tmp));
-				if (i == (pCurrentAdapter->AddressLength - 1)) {
-					sprintf(tmp, "%.2X", (int)pCurrentAdapter->Address[i]);
-				}
-				else {
-					sprintf(tmp, "%.2X-", (int)pCurrentAdapter->Address[i]);
-				}
-				strcat(buf, tmp);
+			for (i = 0, pos = buf; i < pCurrentAdapter->AddressLength; i++, pos += 3) {
+				sprintf(pos, "%.2X-", (int)pCurrentAdapter->Address[i]);
 			}
+			*(--pos) = '\0'; // remove last -
 			address = strdup(buf);
 			break;
 		}
