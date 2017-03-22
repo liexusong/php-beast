@@ -46,24 +46,18 @@ static int beast_mm_initialized = 0;
 static void *beast_mm_block = NULL;
 static int beast_mm_block_size = 0;
 static beast_atomic_t *mm_lock;
-static int mm_pid = -1;
+extern int beast_pid;
 
 
 void beast_mm_lock()
 {
-    if (mm_pid == -1) {
-        mm_pid = (int)getpid();
-    }
-    beast_spinlock(mm_lock, mm_pid);
+    beast_spinlock(mm_lock, beast_pid);
 }
 
 
 void beast_mm_unlock()
 {
-    if (mm_pid == -1) {
-        mm_pid = (int)getpid();
-    }
-    beast_spinunlock(mm_lock, mm_pid);
+    beast_spinunlock(mm_lock, beast_pid);
 }
 
 

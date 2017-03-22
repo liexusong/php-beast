@@ -34,24 +34,18 @@
 static int beast_cache_initialization = 0;
 static cache_item_t **beast_cache_buckets = NULL;
 static beast_atomic_t *cache_lock;
-static int cache_pid = -1;
+extern int beast_pid;
 
 
 void beast_cache_lock()
 {
-    if (cache_pid == -1) {
-        cache_pid = (int)getpid();
-    }
-    beast_spinlock(cache_lock, cache_pid);
+    beast_spinlock(cache_lock, beast_pid);
 }
 
 
 void beast_cache_unlock()
 {
-    if (cache_pid == -1) {
-        cache_pid = (int)getpid();
-    }
-    beast_spinunlock(cache_lock, cache_pid);
+    beast_spinunlock(cache_lock, beast_pid);
 }
 
 

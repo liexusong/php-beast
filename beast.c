@@ -83,6 +83,7 @@ char *beast_log_file = NULL;
 char *beast_log_user = NULL;
 int beast_ncpu = 1;
 int beast_is_root = 0;
+int beast_pid = -1;
 
 /* True global resources - no need for thread safety here */
 static zend_op_array* (*old_compile_file)(zend_file_handle*, int TSRMLS_DC);
@@ -1194,7 +1195,12 @@ PHP_MSHUTDOWN_FUNCTION(beast)
  */
 PHP_RINIT_FUNCTION(beast)
 {
+    if (beast_pid == -1) {
+        beast_pid = getpid();
+    }
+
     beast_now_time = time(NULL); /* Update now time */
+
     return SUCCESS;
 }
 /* }}} */
