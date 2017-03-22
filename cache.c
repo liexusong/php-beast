@@ -36,17 +36,8 @@ static cache_item_t **beast_cache_buckets = NULL;
 static beast_atomic_t *cache_lock;
 extern int beast_pid;
 
-
-void beast_cache_lock()
-{
-    beast_spinlock(cache_lock, beast_pid);
-}
-
-
-void beast_cache_unlock()
-{
-    beast_spinunlock(cache_lock, beast_pid);
-}
+#define beast_cache_lock()    beast_spinlock(cache_lock, beast_pid)
+#define beast_cache_unlock()  beast_spinunlock(cache_lock, beast_pid)
 
 
 static inline unsigned int
