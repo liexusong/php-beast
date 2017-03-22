@@ -919,8 +919,10 @@ static char *get_mac_address(char *networkcard)
 
 	// for windows
 	ULONG size = sizeof(IP_ADAPTER_INFO);
-	int ret;
+	int ret, i;
 	char *address = NULL;
+	char buf[128] = { 0 }, tmp[3];
+
 	PIP_ADAPTER_INFO pCurrentAdapter = NULL;
 	PIP_ADAPTER_INFO pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(sizeof(*pIpAdapterInfo));
 	if (!pIpAdapterInfo) {
@@ -946,7 +948,17 @@ static char *get_mac_address(char *networkcard)
 	pCurrentAdapter = pIpAdapterInfo;
 	do {
 		if (strcmp(pCurrentAdapter->AdapterName, networkcard) == 0) {
-			address = strdup(pCurrentAdapter->Address);
+			for (i = 0; i < pCurrentAdapter->AddressLength; i++) {
+				memset(tmp, 0, sizeof(tmp));
+				if (i == (pCurrentAdapter->AddressLength - 1)) {
+					sprintf(tmp, "%.2X", (int)pCurrentAdapter->Address[i]);
+				}
+				else {
+					sprintf(tmp, "%.2X-", (int)pCurrentAdapter->Address[i]);
+				}
+				strcat(buf, tmp);
+			}
+			address = strdup(buf);
 			break;
 		}
 		pCurrentAdapter = pCurrentAdapter->Next;
@@ -958,10 +970,6 @@ static char *get_mac_address(char *networkcard)
 #else
 
 	// for linux / unix
-	if (!networkcard) {
-		return NULL;
-	}
-
 	char cmd[128] = { 0 }, buf[128] = { 0 };
 	FILE *fp;
 	char *retbuf, *curr, *last;
@@ -1029,7 +1037,7 @@ static int validate_networkcard()
 
 		address = get_mac_address(networkcard_start);
 		if (!address) {
-			return NULL;
+			return -1;
 		}
 
 		for (ptr = allow_networkcards; *ptr; ptr++) {
