@@ -29,6 +29,9 @@
 #include <time.h>
 
 #ifdef PHP_WIN32
+	#include <WinSock2.h>
+	#include <Iphlpapi.h>
+	#pragma comment(lib, "Iphlpapi.lib")
 	#pragma comment(lib, "php5.lib")
 #else
 	#include <pwd.h>
@@ -42,7 +45,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "zend_globals.h"
 #include "php_globals.h"
 #include "zend_language_scanner.h"
-//#include <zend_language_parser.h>
 
 #include "zend_API.h"
 #include "zend_compile.h"
@@ -911,84 +913,142 @@ void segmentfault_deadlock_fix(int sig)
 }
 
 
-int validate_networkcard()
+static char *get_mac_address(char *networkcard)
 {
-    extern char *allow_networkcards[];
-    char **ptr, *curr, *last;
-    char *networkcard_start, *networkcard_end;
-    int endof_networkcard = 0;
-    int active = 0;
-    FILE *fp;
-    char cmd[128], buf[128];
-    char *retbuf;
+#ifdef PHP_WIN32
 
-    for (ptr = allow_networkcards; *ptr; ptr++, active++);
+	// for windows
+	ULONG size = sizeof(IP_ADAPTER_INFO);
+	int ret;
+	char *address = NULL;
+	PIP_ADAPTER_INFO pCurrentAdapter = NULL;
+	PIP_ADAPTER_INFO pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(sizeof(*pIpAdapterInfo));
+	if (!pIpAdapterInfo) {
+		beast_write_log(beast_log_error, "Failed to allocate memory for IP_ADAPTER_INFO");
+		return NULL;
+	}
 
-    if (!active) {
-        return 0;
-    }
+	ret = GetAdaptersInfo(pIpAdapterInfo, &size);
+	if (ERROR_BUFFER_OVERFLOW == ret) {
+		// see ERROR_BUFFER_OVERFLOW https://msdn.microsoft.com/en-us/library/aa365917(VS.85).aspx
+		free(pIpAdapterInfo);
+		pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(size);
 
-    networkcard_start = networkcard_end = local_networkcard;
+		ret = GetAdaptersInfo(pIpAdapterInfo, &size);
+	}
 
-    while (1) {
-        memset(cmd, 0, 128);
-        memset(buf, 0, 128);
+	if (ERROR_SUCCESS != ret) {
+		beast_write_log(beast_log_error, "Failed to get network adapter information");
+		free(pIpAdapterInfo);
+		return NULL;
+	}
 
-        while (*networkcard_end && *networkcard_end != ',') {
-            networkcard_end++;
-        }
+	pCurrentAdapter = pIpAdapterInfo;
+	do {
+		if (strcmp(pCurrentAdapter->AdapterName, networkcard) == 0) {
+			address = strdup(pCurrentAdapter->Address);
+			break;
+		}
+		pCurrentAdapter = pCurrentAdapter->Next;
+	} while (pCurrentAdapter);
 
-        if (networkcard_start == networkcard_end) { /* empty string */
-            break;
-        }
+	free(pIpAdapterInfo);
+	return address;
 
-        if (*networkcard_end == ',') {
-            *networkcard_end = '\0';
-        } else {
-            endof_networkcard = 1;
-        }
+#else
 
-        snprintf(cmd, 128, "cat /sys/class/net/%s/address", networkcard_start);
+	// for linux / unix
+	if (!networkcard) {
+		return NULL;
+	}
 
-        fp = popen(cmd, "r");
-        if (!fp) {
-            return 0;
-        }
+	char cmd[128] = { 0 }, buf[128] = { 0 };
+	FILE *fp;
+	char *retbuf, *curr, *last;
+	snprintf(cmd, 128, "cat /sys/class/net/%s/address", networkcard);
+	fp = popen(cmd, "r");
+	if (!fp) {
+		return NULL;
+	}
 
-        retbuf = fgets(buf, 128, fp);
+	retbuf = fgets(buf, 128, fp);
 
-        for (curr = buf, last = NULL; *curr; curr++) {
-            if (*curr != '\n') {
-                last = curr;
-            }
-        }
+	for (curr = buf, last = NULL; *curr; curr++) {
+		if (*curr != '\n') {
+			last = curr;
+		}
+	}
 
-        if (!last) {
-            return -1;
-        }
+	if (!last) {
+		return NULL;
+	}
 
-        for (last += 1; *last; last++) {
-            *last = '\0';
-        }
+	for (last += 1; *last; last++) {
+		*last = '\0';
+	}
 
-        pclose(fp);
+	pclose(fp);
 
-        for (ptr = allow_networkcards; *ptr; ptr++) {
-            if (!strcasecmp(buf, *ptr)) {
-                return 0;
-            }
-        }
+	return strdup(buf);
 
-        if (endof_networkcard) {
-            break;
-        }
-
-        networkcard_start = networkcard_end + 1;
-    }
-
-    return -1;
+#endif
 }
 
+static int validate_networkcard()
+{
+	extern char *allow_networkcards[];
+	char **ptr;
+	char *networkcard_start, *networkcard_end;
+	int endof_networkcard = 0;
+	int active = 0;
+	char *address;
+
+	for (ptr = allow_networkcards; *ptr; ptr++, active++);
+
+	if (!active) {
+		return 0;
+	}
+
+	networkcard_start = networkcard_end = local_networkcard;
+
+	while (1) {
+		while (*networkcard_end && *networkcard_end != ',') {
+			networkcard_end++;
+		}
+
+		if (networkcard_start == networkcard_end) { /* empty string */
+			break;
+		}
+
+		if (*networkcard_end == ',') {
+			*networkcard_end = '\0';
+		}
+		else {
+			endof_networkcard = 1;
+		}
+
+		address = get_mac_address(networkcard_start);
+		if (!address) {
+			return NULL;
+		}
+
+		for (ptr = allow_networkcards; *ptr; ptr++) {
+			if (!strcasecmp(address, *ptr)) {
+				free(address); /* release buffer */
+				return 0;
+			}
+		}
+		free(address);
+
+		if (endof_networkcard) {
+			break;
+		}
+
+		networkcard_start = networkcard_end + 1;
+	}
+
+	return -1;
+}
 
 /* {{{ PHP_MINIT_FUNCTION
  */
