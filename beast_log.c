@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #ifdef PHP_WIN32
+
 #else
 #include <unistd.h>
 #endif

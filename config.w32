@@ -1,13 +1,13 @@
 // $Id$
 // vim:ft=javascript
 
-// If your extension references something external, use ARG_WITH
-// ARG_WITH("beast", "for beast support", "no");
+// If your extension references something external
+ARG_WITH("beast", "for beast support", "yes,shared");
 
-// Otherwise, use ARG_ENABLE
-// ARG_ENABLE("beast", "enable beast support", "no");
+
+ARG_ENABLE("beast", "enable beast support", "yes,shared");
 
 if (PHP_BEAST != "no") {
-	EXTENSION("beast", "beast.c");
+	EXTENSION("beast", "beast.c aes_algo_handler.c des_algo_handler.c base64_algo_handler.c beast_mm.c spinlock.c cache.c beast_log.c global_algo_modules.c header.c networkcards.c tmpfile_file_handler.c file_handler_switch.c", true);
 }
 

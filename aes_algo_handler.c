@@ -94,8 +94,9 @@ void aes_free_handler(void *ptr)
 }
 
 struct beast_ops aes_handler_ops = {
-	.name = "aes-algo",
-	.encrypt = aes_encrypt_handler,
-	.decrypt = aes_decrypt_handler,
-	.free = aes_free_handler,
+	"aes-algo",
+	aes_encrypt_handler,
+	aes_decrypt_handler,
+	aes_free_handler,
+	NULL
 };

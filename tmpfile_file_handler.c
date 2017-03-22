@@ -73,18 +73,18 @@ int tmpfile_handler_destroy(struct file_handler *self)
 }
 
 static struct tmpfile_handler_ctx _ctx = {
-    .fp = NULL
+	NULL
 };
 
 struct file_handler tmpfile_handler = {
-    .name    = "tmpfile",
-    .type    = BEAST_FILE_HANDLER_FP,
-    .ctx     = &_ctx,
-    .check   = tmpfile_handler_check,
-    .open    = tmpfile_handler_open,
-    .write   = tmpfile_handler_write,
-    .rewind  = tmpfile_handler_rewind,
-    .get_fp  = tmpfile_handler_get_fp,
-    .get_fd  = tmpfile_handler_get_fd,
-    .destroy = tmpfile_handler_destroy
+	"tmpfile",
+	BEAST_FILE_HANDLER_FP,
+	&_ctx,
+	tmpfile_handler_check,
+	tmpfile_handler_open,
+	tmpfile_handler_write,
+	tmpfile_handler_rewind,
+	tmpfile_handler_get_fd,
+	tmpfile_handler_get_fp,
+	tmpfile_handler_destroy
 };

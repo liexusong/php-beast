@@ -29,6 +29,7 @@
 #include <time.h>
 
 #ifdef PHP_WIN32
+	#pragma comment(lib, "php5.lib")
 #else
 	#include <pwd.h>
 	#include <unistd.h>
@@ -41,7 +42,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "zend_globals.h"
 #include "php_globals.h"
 #include "zend_language_scanner.h"
-#include <zend_language_parser.h>
+//#include <zend_language_parser.h>
 
 #include "zend_API.h"
 #include "zend_compile.h"
@@ -58,6 +59,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_log.h"
 #include "beast_module.h"
 #include "file_handler.h"
+
 
 #if ZEND_MODULE_API_NO >= 20151012
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
@@ -352,6 +354,7 @@ int decrypt_file(const char *filename, int stream,
     int entype;
     struct beast_ops *encrypt_ops;
     int retval = -1;
+	int n = 0;
 
     *free_buffer = 0; /* set free buffer flag to false */
 
@@ -382,10 +385,9 @@ int decrypt_file(const char *filename, int stream,
      * 3) 1 int is encrypt type.
      */
     headerlen = encrypt_file_header_length + INT_SIZE * 3;
-
-    if (read(stream, header, headerlen) != headerlen) {
+	if ((n = read(stream, header, headerlen)) != headerlen) {
         beast_write_log(beast_log_error,
-                        "Failed to readed header from file `%s'", filename);
+                        "Failed to readed header from file `%s', headerlen:%d, readlen:%d", filename, headerlen, n);
         retval = -1;
         goto failed;
     }
@@ -521,7 +523,8 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     struct beast_ops *ops = NULL;
     int destroy_file_handler = 0;
 
-    filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+	filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+	//filep = fopen(h->filename, "rb");
      if (filep != NULL) {
          fd = fileno(filep);
      } else {
@@ -992,6 +995,9 @@ int validate_networkcard()
 PHP_MINIT_FUNCTION(beast)
 {
     int i;
+#ifdef PHP_WIN32
+	SYSTEM_INFO info;
+#endif
 
     /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
@@ -1065,7 +1071,6 @@ PHP_MINIT_FUNCTION(beast)
     old_compile_file = zend_compile_file;
     zend_compile_file = cgi_compile_file;
 #ifdef PHP_WIN32
-	SYSTEM_INFO info;
 	GetSystemInfo(&info);
 	beast_ncpu = info.dwNumberOfProcessors;
 #else

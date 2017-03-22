@@ -214,6 +214,9 @@ int beast_mm_init(int block_size)
     beast_header_t *header;
     beast_block_t *block;
     void *shmaddr;
+#ifdef PHP_WIN32
+	HANDLE hLockMapFile, hBlockMapFile;
+#endif
 
     if (beast_mm_initialized) {
         return 0;
@@ -222,7 +225,7 @@ int beast_mm_init(int block_size)
     /* init memory manager lock */
 #ifdef PHP_WIN32
 	mm_lock = NULL;
-	HANDLE hLockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+	hLockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
 		NULL, PAGE_READWRITE, 0, sizeof(int), NULL);
 	if (hLockMapFile) {
 		mm_lock = MapViewOfFile(
@@ -257,7 +260,7 @@ int beast_mm_init(int block_size)
     }
 
 #ifdef PHP_WIN32
-	HANDLE hBlockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+	hBlockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
 		NULL, PAGE_READWRITE, 0, beast_mm_block_size, NULL);
 	if (hBlockMapFile) {
 		shmaddr = beast_mm_block = MapViewOfFile(

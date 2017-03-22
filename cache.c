@@ -69,6 +69,9 @@ beast_cache_hash(cache_key_t *key)
 int beast_cache_init(int size)
 {
     int index, bucket_size;
+#ifdef PHP_WIN32
+	HANDLE hLockMapFile, hBucketsMapFile;
+#endif
 
     if (beast_cache_initialization) {
         return 0;
@@ -81,7 +84,7 @@ int beast_cache_init(int size)
     /* init cache lock */
 #ifdef PHP_WIN32
 	cache_lock = NULL;
-	HANDLE hLockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+	hLockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
 		NULL, PAGE_READWRITE, 0, sizeof(int), NULL);
 	if (hLockMapFile) {
 		cache_lock = MapViewOfFile(
@@ -114,7 +117,7 @@ int beast_cache_init(int size)
     bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
 
 #ifdef PHP_WIN32
-	HANDLE hBucketsMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
+	hBucketsMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
 		NULL, PAGE_READWRITE, 0, bucket_size, NULL);
 	if (hBucketsMapFile) {
 		beast_cache_buckets = (cache_item_t **)MapViewOfFile(
