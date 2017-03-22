@@ -1,3 +1,6 @@
+
+#ifndef PHP_WIN32
+
 #include <stdlib.h>
 #include <stdio.h>
 #include "file_handler.h"
@@ -76,18 +79,20 @@ int pipe_handler_destroy(struct file_handler *self)
 }
 
 static struct pipe_handler_ctx _ctx = {
-    .fd = {-1, -1}
+    {-1, -1}
 };
 
 struct file_handler pipe_handler = {
-    .name    = "pipe",
-    .type    = BEAST_FILE_HANDLER_FD,
-    .ctx     = &_ctx,
-    .check   = pipe_handler_check,
-    .open    = pipe_handler_open,
-    .write   = pipe_handler_write,
-    .rewind  = pipe_handler_rewind,
-    .get_fp  = pipe_handler_get_fp,
-    .get_fd  = pipe_handler_get_fd,
-    .destroy = pipe_handler_destroy
+    "pipe",
+    BEAST_FILE_HANDLER_FD,
+    &_ctx,
+    pipe_handler_check,
+    pipe_handler_open,
+    pipe_handler_write,
+    pipe_handler_rewind,
+    pipe_handler_get_fd,
+    pipe_handler_get_fp,
+    pipe_handler_destroy
 };
+
+#endif

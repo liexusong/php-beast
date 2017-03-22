@@ -62,7 +62,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_module.h"
 #include "file_handler.h"
 
-
 #if ZEND_MODULE_API_NO >= 20151012
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
 #else
@@ -869,7 +868,7 @@ ZEND_INI_MH(php_beast_set_log_normal_file)
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "10485760", PHP_INI_ALL,
           php_beast_cache_size)
-    PHP_INI_ENTRY("beast.log_file", "/tmp/php-beast.log", PHP_INI_ALL,
+    PHP_INI_ENTRY("beast.log_file", "./php-beast.log", PHP_INI_ALL,
           php_beast_log_file)
     PHP_INI_ENTRY("beast.log_user", "root", PHP_INI_ALL,
           php_beast_log_user)
@@ -917,7 +916,7 @@ static char *get_mac_address(char *networkcard)
 {
 #ifdef PHP_WIN32
 
-	// for windows
+	// For windows
 	ULONG size = sizeof(IP_ADAPTER_INFO);
 	int ret, i;
 	char *address = NULL;
@@ -969,11 +968,19 @@ static char *get_mac_address(char *networkcard)
 
 #else
 
-	// for linux / unix
-	char cmd[128] = { 0 }, buf[128] = { 0 };
+	// For linux / unix
+	char netfile[128] = { 0 }, cmd[128] = { 0 }, buf[128] = { 0 };
 	FILE *fp;
 	char *retbuf, *curr, *last;
-	snprintf(cmd, 128, "cat /sys/class/net/%s/address", networkcard);
+
+	snprintf(netfile, 128, "/sys/class/net/%s/address", networkcard);
+
+    if (access((const char *)netfile, R_OK) != 0) { /* File not exists */
+        return NULL;
+    }
+
+    snprintf(cmd, 128, "cat %s", netfile);
+
 	fp = popen(cmd, "r");
 	if (!fp) {
 		return NULL;
@@ -1227,16 +1234,16 @@ PHP_FUNCTION(beast_file_expire)
 
 #if ZEND_MODULE_API_NO >= 20151012
 
-    zend_string *__file;
+    zend_string *input_file;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S",
-                              &__file TSRMLS_CC) == FAILURE)
+                              &input_file TSRMLS_CC) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    file     = ZSTR_VAL(__file);
-    file_len = ZSTR_LEN(__file);
+    file     = ZSTR_VAL(input_file);
+    file_len = ZSTR_LEN(input_file);
 
 #else
 

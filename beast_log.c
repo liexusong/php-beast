@@ -53,7 +53,8 @@ void beast_write_log(beast_log_level level, const char *fmt, ...)
     char *headers[] = {"DEBUG", "NOTICE", "ERROR"};
     va_list ap;
 
-    if (beast_log_fp == NULL || level > beast_log_error ||
+    if (beast_log_fp == NULL ||
+        level > beast_log_error ||
         level < beast_log_debug)
     {
         return;
