@@ -17,10 +17,7 @@
 
 #include "spinlock.h"
 #include "beast_log.h"
-
-#ifndef MAP_NOSYNC
-#define MAP_NOSYNC 0
-#endif
+#include "shm.h"
 
 #define BEAST_SEGMENT_DEFAULT_SIZE (256 * 1024)
 
@@ -214,37 +211,13 @@ int beast_mm_init(int block_size)
     beast_header_t *header;
     beast_block_t *block;
     void *shmaddr;
-#ifdef PHP_WIN32
-	HANDLE hLockMapFile, hBlockMapFile;
-#endif
 
     if (beast_mm_initialized) {
         return 0;
     }
 
     /* init memory manager lock */
-#ifdef PHP_WIN32
-	mm_lock = NULL;
-	hLockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
-		NULL, PAGE_READWRITE, 0, sizeof(int), NULL);
-	if (hLockMapFile) {
-		mm_lock = MapViewOfFile(
-			hLockMapFile,
-			FILE_MAP_ALL_ACCESS,
-			0,
-			0,
-			sizeof(int)
-		);
-		CloseHandle(hLockMapFile);
-}
-#else
-    mm_lock = (int *)mmap(NULL,
-                          sizeof(int),
-                          PROT_READ|PROT_WRITE,
-                          MAP_SHARED|MAP_ANON,
-                          -1,
-                          0);
-#endif
+    mm_lock = (int *)beast_shm_alloc(sizeof(int));
     if (!mm_lock) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for memory manager lock");
@@ -259,35 +232,11 @@ int beast_mm_init(int block_size)
         beast_mm_block_size = block_size;
     }
 
-#ifdef PHP_WIN32
-	hBlockMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,
-		NULL, PAGE_READWRITE, 0, beast_mm_block_size, NULL);
-	if (hBlockMapFile) {
-		shmaddr = beast_mm_block = MapViewOfFile(
-			hBlockMapFile,
-			FILE_MAP_ALL_ACCESS,
-			0,
-			0,
-			beast_mm_block_size
-		);
-		CloseHandle(hBlockMapFile);
-	}
-#else
-    shmaddr = beast_mm_block = (void *)mmap(NULL,
-                                            beast_mm_block_size,
-                                            PROT_READ|PROT_WRITE,
-                                            MAP_SHARED|MAP_ANON,
-                                            -1,
-                                            0);
-#endif
+    shmaddr = beast_mm_block = (void *)beast_shm_alloc(beast_mm_block_size);
     if (!beast_mm_block) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for beast");
-#ifdef PHP_WIN32
-		UnmapViewOfFile(mm_lock);
-#else
-        munmap((void *)mm_lock, sizeof(int));
-#endif
+        beast_shm_free((void *)mm_lock, sizeof(int));
         return -1;
     }
 
@@ -430,15 +379,8 @@ int beast_mm_realspace()
 void beast_mm_destroy()
 {
     if (beast_mm_initialized) {
-#ifdef PHP_WIN32
-		UnmapViewOfFile(beast_mm_block);
-		UnmapViewOfFile(mm_lock);
-#else
-        /* Free cache memory */
-        munmap((void *)beast_mm_block, beast_mm_block_size);
-        /* Free memory lock */
-        munmap((void *)mm_lock, sizeof(int));
-#endif
+        beast_shm_free((void *)beast_mm_block, beast_mm_block_size);
+        beast_shm_free((void *)mm_lock, sizeof(int));
         beast_mm_initialized = 0;
     }
 }
