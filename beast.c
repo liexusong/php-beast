@@ -1044,17 +1044,15 @@ static int validate_networkcard()
 		}
 
 		address = get_mac_address(networkcard_start);
-		if (!address) {
-			return -1;
+		if (address) {
+			for (ptr = allow_networkcards; *ptr; ptr++) {
+                if (!strcasecmp(address, *ptr)) {
+                    free(address); /* release buffer */
+                    return 0;
+                }
+            }
+            free(address);
 		}
-
-		for (ptr = allow_networkcards; *ptr; ptr++) {
-			if (!strcasecmp(address, *ptr)) {
-				free(address); /* release buffer */
-				return 0;
-			}
-		}
-		free(address);
 
 		if (endof_networkcard) {
 			break;
