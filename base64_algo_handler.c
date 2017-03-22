@@ -206,8 +206,9 @@ void base64_free_handler(void *ptr)
 
 
 struct beast_ops base64_handler_ops = {
-	.name = "base64-algo",
-	.encrypt = base64_encrypt_handler,
-	.decrypt = base64_decrypt_handler,
-	.free = base64_free_handler,
+	"base64-algo",
+	base64_encrypt_handler,
+	base64_decrypt_handler,
+	base64_free_handler,
+	NULL
 };

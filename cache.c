@@ -18,13 +18,16 @@
 
 #include <stdlib.h>
 #include <sys/types.h>
+#ifndef PHP_WIN32
 #include <sys/mman.h>
+#endif
 
 #include "beast_mm.h"
 #include "spinlock.h"
 #include "php.h"
 #include "cache.h"
 #include "beast_log.h"
+#include "shm.h"
 
 #define BUCKETS_DEFAULT_SIZE 1021
 
@@ -77,12 +80,7 @@ int beast_cache_init(int size)
     }
 
     /* init cache lock */
-    cache_lock = (int *)mmap(NULL,
-                             sizeof(int),
-                             PROT_READ|PROT_WRITE,
-                             MAP_SHARED|MAP_ANON,
-                             -1,
-                             0);
+    cache_lock = (int *)beast_shm_alloc(sizeof(int));
     if (!cache_lock) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for cache lock");
@@ -94,17 +92,12 @@ int beast_cache_init(int size)
 
     /* init cache buckets's memory */
     bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
+    beast_cache_buckets = (cache_item_t **)beast_shm_alloc(bucket_size);
 
-    beast_cache_buckets = (cache_item_t **)mmap(NULL,
-                                                bucket_size,
-                                                PROT_READ|PROT_WRITE,
-                                                MAP_SHARED|MAP_ANON,
-                                                -1,
-                                                0);
     if (!beast_cache_buckets) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for cache buckets");
-        munmap((void *)cache_lock, sizeof(int));
+        beast_shm_free((void *)cache_lock, sizeof(int));
         beast_mm_destroy();
         return -1;
     }
@@ -228,11 +221,9 @@ int beast_cache_destroy()
     beast_mm_destroy(); /* destroy memory manager */
 
     /* free cache buckets's mmap memory */
-    munmap((void *)beast_cache_buckets,
-           sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
-
-    munmap((void *)cache_lock, sizeof(int));
-
+    beast_shm_free((void *)beast_cache_buckets,
+            sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
+    beast_shm_free((void *)cache_lock, sizeof(int));
     beast_cache_initialization = 0;
 
     return 0;

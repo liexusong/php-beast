@@ -9,14 +9,15 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#ifdef PHP_WIN32
+#include <Windows.h>
+#else
 #include <sys/mman.h>
+#endif
 
 #include "spinlock.h"
 #include "beast_log.h"
-
-#ifndef MAP_NOSYNC
-#define MAP_NOSYNC 0
-#endif
+#include "shm.h"
 
 #define BEAST_SEGMENT_DEFAULT_SIZE (256 * 1024)
 
@@ -216,12 +217,7 @@ int beast_mm_init(int block_size)
     }
 
     /* init memory manager lock */
-    mm_lock = (int *)mmap(NULL,
-                          sizeof(int),
-                          PROT_READ|PROT_WRITE,
-                          MAP_SHARED|MAP_ANON,
-                          -1,
-                          0);
+    mm_lock = (int *)beast_shm_alloc(sizeof(int));
     if (!mm_lock) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for memory manager lock");
@@ -236,16 +232,11 @@ int beast_mm_init(int block_size)
         beast_mm_block_size = block_size;
     }
 
-    shmaddr = beast_mm_block = (void *)mmap(NULL,
-                                            beast_mm_block_size,
-                                            PROT_READ|PROT_WRITE,
-                                            MAP_SHARED|MAP_ANON,
-                                            -1,
-                                            0);
+    shmaddr = beast_mm_block = (void *)beast_shm_alloc(beast_mm_block_size);
     if (!beast_mm_block) {
         beast_write_log(beast_log_error,
                         "Unable alloc share memory for beast");
-        munmap((void *)mm_lock, sizeof(int));
+        beast_shm_free((void *)mm_lock, sizeof(int));
         return -1;
     }
 
@@ -388,10 +379,8 @@ int beast_mm_realspace()
 void beast_mm_destroy()
 {
     if (beast_mm_initialized) {
-        /* Free cache memory */
-        munmap((void *)beast_mm_block, beast_mm_block_size);
-        /* Free memory lock */
-        munmap((void *)mm_lock, sizeof(int));
+        beast_shm_free((void *)beast_mm_block, beast_mm_block_size);
+        beast_shm_free((void *)mm_lock, sizeof(int));
         beast_mm_initialized = 0;
     }
 }

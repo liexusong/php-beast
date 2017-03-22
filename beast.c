@@ -24,11 +24,19 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <time.h>
-#include <pwd.h>
+
+#ifdef PHP_WIN32
+	#include <WinSock2.h>
+	#include <Iphlpapi.h>
+	#pragma comment(lib, "Iphlpapi.lib")
+	#pragma comment(lib, "php5.lib")
+#else
+	#include <pwd.h>
+	#include <unistd.h>
+#endif
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
@@ -37,7 +45,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "zend_globals.h"
 #include "php_globals.h"
 #include "zend_language_scanner.h"
-#include <zend_language_parser.h>
 
 #include "zend_API.h"
 #include "zend_compile.h"
@@ -54,6 +61,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_log.h"
 #include "beast_module.h"
 #include "file_handler.h"
+
 
 #if ZEND_MODULE_API_NO >= 20151012
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
@@ -131,7 +139,9 @@ extern struct file_handler pipe_handler;
 static struct file_handler *default_file_handler = NULL;
 static struct file_handler *file_handlers[] = {
     &tmpfile_handler,
+#ifndef PHP_WIN32
     &pipe_handler,
+#endif
     NULL
 };
 
@@ -346,6 +356,7 @@ int decrypt_file(const char *filename, int stream,
     int entype;
     struct beast_ops *encrypt_ops;
     int retval = -1;
+	int n = 0;
 
     *free_buffer = 0; /* set free buffer flag to false */
 
@@ -376,10 +387,9 @@ int decrypt_file(const char *filename, int stream,
      * 3) 1 int is encrypt type.
      */
     headerlen = encrypt_file_header_length + INT_SIZE * 3;
-
-    if (read(stream, header, headerlen) != headerlen) {
+	if ((n = read(stream, header, headerlen)) != headerlen) {
         beast_write_log(beast_log_error,
-                        "Failed to readed header from file `%s'", filename);
+                        "Failed to readed header from file `%s', headerlen:%d, readlen:%d", filename, headerlen, n);
         retval = -1;
         goto failed;
     }
@@ -515,7 +525,8 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     struct beast_ops *ops = NULL;
     int destroy_file_handler = 0;
 
-    filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+	filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+	//filep = fopen(h->filename, "rb");
      if (filep != NULL) {
          fd = fileno(filep);
      } else {
@@ -875,6 +886,9 @@ PHP_INI_END()
 
 void segmentfault_deadlock_fix(int sig)
 {
+#ifdef PHP_WIN32 // windows not support backtrace
+	beast_write_log(beast_log_error, "Segmentation fault and fix deadlock");
+#else
     void *array[10] = {0};
     size_t size;
     char **info = NULL;
@@ -891,7 +905,7 @@ void segmentfault_deadlock_fix(int sig)
         }
         free(info);
     }
-
+#endif
     beast_mm_unlock();     /* Maybe lock mm so free here */
     beast_cache_unlock();  /* Maybe lock cache so free here */
 
@@ -899,90 +913,159 @@ void segmentfault_deadlock_fix(int sig)
 }
 
 
-int validate_networkcard()
+static char *get_mac_address(char *networkcard)
 {
-    extern char *allow_networkcards[];
-    char **ptr, *curr, *last;
-    char *networkcard_start, *networkcard_end;
-    int endof_networkcard = 0;
-    int active = 0;
-    FILE *fp;
-    char cmd[128], buf[128];
-    char *retbuf;
+#ifdef PHP_WIN32
 
-    for (ptr = allow_networkcards; *ptr; ptr++, active++);
+	// for windows
+	ULONG size = sizeof(IP_ADAPTER_INFO);
+	int ret, i;
+	char *address = NULL;
+	char buf[128] = { 0 }, tmp[3];
 
-    if (!active) {
-        return 0;
-    }
+	PIP_ADAPTER_INFO pCurrentAdapter = NULL;
+	PIP_ADAPTER_INFO pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(sizeof(*pIpAdapterInfo));
+	if (!pIpAdapterInfo) {
+		beast_write_log(beast_log_error, "Failed to allocate memory for IP_ADAPTER_INFO");
+		return NULL;
+	}
 
-    networkcard_start = networkcard_end = local_networkcard;
+	ret = GetAdaptersInfo(pIpAdapterInfo, &size);
+	if (ERROR_BUFFER_OVERFLOW == ret) {
+		// see ERROR_BUFFER_OVERFLOW https://msdn.microsoft.com/en-us/library/aa365917(VS.85).aspx
+		free(pIpAdapterInfo);
+		pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(size);
 
-    while (1) {
-        memset(cmd, 0, 128);
-        memset(buf, 0, 128);
+		ret = GetAdaptersInfo(pIpAdapterInfo, &size);
+	}
 
-        while (*networkcard_end && *networkcard_end != ',') {
-            networkcard_end++;
-        }
+	if (ERROR_SUCCESS != ret) {
+		beast_write_log(beast_log_error, "Failed to get network adapter information");
+		free(pIpAdapterInfo);
+		return NULL;
+	}
 
-        if (networkcard_start == networkcard_end) { /* empty string */
-            break;
-        }
+	pCurrentAdapter = pIpAdapterInfo;
+	do {
+		if (strcmp(pCurrentAdapter->AdapterName, networkcard) == 0) {
+			for (i = 0; i < pCurrentAdapter->AddressLength; i++) {
+				memset(tmp, 0, sizeof(tmp));
+				if (i == (pCurrentAdapter->AddressLength - 1)) {
+					sprintf(tmp, "%.2X", (int)pCurrentAdapter->Address[i]);
+				}
+				else {
+					sprintf(tmp, "%.2X-", (int)pCurrentAdapter->Address[i]);
+				}
+				strcat(buf, tmp);
+			}
+			address = strdup(buf);
+			break;
+		}
+		pCurrentAdapter = pCurrentAdapter->Next;
+	} while (pCurrentAdapter);
 
-        if (*networkcard_end == ',') {
-            *networkcard_end = '\0';
-        } else {
-            endof_networkcard = 1;
-        }
+	free(pIpAdapterInfo);
+	return address;
 
-        snprintf(cmd, 128, "cat /sys/class/net/%s/address", networkcard_start);
+#else
 
-        fp = popen(cmd, "r");
-        if (!fp) {
-            return 0;
-        }
+	// for linux / unix
+	char cmd[128] = { 0 }, buf[128] = { 0 };
+	FILE *fp;
+	char *retbuf, *curr, *last;
+	snprintf(cmd, 128, "cat /sys/class/net/%s/address", networkcard);
+	fp = popen(cmd, "r");
+	if (!fp) {
+		return NULL;
+	}
 
-        retbuf = fgets(buf, 128, fp);
+	retbuf = fgets(buf, 128, fp);
 
-        for (curr = buf, last = NULL; *curr; curr++) {
-            if (*curr != '\n') {
-                last = curr;
-            }
-        }
+	for (curr = buf, last = NULL; *curr; curr++) {
+		if (*curr != '\n') {
+			last = curr;
+		}
+	}
 
-        if (!last) {
-            return -1;
-        }
+	if (!last) {
+		return NULL;
+	}
 
-        for (last += 1; *last; last++) {
-            *last = '\0';
-        }
+	for (last += 1; *last; last++) {
+		*last = '\0';
+	}
 
-        pclose(fp);
+	pclose(fp);
 
-        for (ptr = allow_networkcards; *ptr; ptr++) {
-            if (!strcasecmp(buf, *ptr)) {
-                return 0;
-            }
-        }
+	return strdup(buf);
 
-        if (endof_networkcard) {
-            break;
-        }
-
-        networkcard_start = networkcard_end + 1;
-    }
-
-    return -1;
+#endif
 }
 
+static int validate_networkcard()
+{
+	extern char *allow_networkcards[];
+	char **ptr;
+	char *networkcard_start, *networkcard_end;
+	int endof_networkcard = 0;
+	int active = 0;
+	char *address;
+
+	for (ptr = allow_networkcards; *ptr; ptr++, active++);
+
+	if (!active) {
+		return 0;
+	}
+
+	networkcard_start = networkcard_end = local_networkcard;
+
+	while (1) {
+		while (*networkcard_end && *networkcard_end != ',') {
+			networkcard_end++;
+		}
+
+		if (networkcard_start == networkcard_end) { /* empty string */
+			break;
+		}
+
+		if (*networkcard_end == ',') {
+			*networkcard_end = '\0';
+		}
+		else {
+			endof_networkcard = 1;
+		}
+
+		address = get_mac_address(networkcard_start);
+		if (!address) {
+			return -1;
+		}
+
+		for (ptr = allow_networkcards; *ptr; ptr++) {
+			if (!strcasecmp(address, *ptr)) {
+				free(address); /* release buffer */
+				return 0;
+			}
+		}
+		free(address);
+
+		if (endof_networkcard) {
+			break;
+		}
+
+		networkcard_start = networkcard_end + 1;
+	}
+
+	return -1;
+}
 
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(beast)
 {
     int i;
+#ifdef PHP_WIN32
+	SYSTEM_INFO info;
+#endif
 
     /* If you have INI entries, uncomment these lines */
     REGISTER_INI_ENTRIES();
@@ -1034,6 +1117,7 @@ PHP_MINIT_FUNCTION(beast)
         return FAILURE;
     }
 
+#ifndef PHP_WIN32
     if (getuid() == 0 && beast_log_user) { /* Change log file owner user */
         struct passwd *pwd;
 
@@ -1050,11 +1134,16 @@ PHP_MINIT_FUNCTION(beast)
             return FAILURE;
         }
     }
+#endif
 
     old_compile_file = zend_compile_file;
     zend_compile_file = cgi_compile_file;
-
-    beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
+#ifdef PHP_WIN32
+	GetSystemInfo(&info);
+	beast_ncpu = info.dwNumberOfProcessors;
+#else
+	beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
+#endif
     if (beast_ncpu <= 0) {
         beast_ncpu = 1;
     }

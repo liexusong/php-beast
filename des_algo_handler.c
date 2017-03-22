@@ -104,8 +104,9 @@ void des_free_handler(void *ptr)
 }
 
 struct beast_ops des_handler_ops = {
-	.name = "des-algo",
-	.encrypt = des_encrypt_handler,
-	.decrypt = des_decrypt_handler,
-	.free = des_free_handler,
+	"des-algo",
+	des_encrypt_handler,
+	des_decrypt_handler,
+	des_free_handler,
+    NULL
 };
