@@ -32,8 +32,12 @@
 #ifdef PHP_WIN32
     #include <WinSock2.h>
     #include <Iphlpapi.h>
+    #if ZEND_MODULE_API_NO >= 20151012
+        #pragma comment(lib, "php7.lib")
+    #else
+        #pragma comment(lib, "php5.lib")
+    #endif
     #pragma comment(lib, "Iphlpapi.lib")
-    #pragma comment(lib, "php5.lib")
 #else
     #include <pwd.h>
     #include <unistd.h>
@@ -917,7 +921,7 @@ void segmentfault_deadlock_fix(int sig)
 static char *get_mac_address(char *networkcard)
 {
 #ifdef PHP_WIN32
-  
+
 	// For windows
 	ULONG size = sizeof(IP_ADAPTER_INFO);
 	int ret, i;
