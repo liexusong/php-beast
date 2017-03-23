@@ -12,7 +12,8 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author: Liexusong <280259971@qq.com>                                 |
+  | Author: Liexusong <liexusong@qq.com>                                 |
+  |         maben <www.maben@foxmail.com>                                |
   +----------------------------------------------------------------------+
 */
 
@@ -29,13 +30,13 @@
 #include <time.h>
 
 #ifdef PHP_WIN32
-	#include <WinSock2.h>
-	#include <Iphlpapi.h>
-	#pragma comment(lib, "Iphlpapi.lib")
-	#pragma comment(lib, "php5.lib")
+    #include <WinSock2.h>
+    #include <Iphlpapi.h>
+    #pragma comment(lib, "Iphlpapi.lib")
+    #pragma comment(lib, "php5.lib")
 #else
-	#include <pwd.h>
-	#include <unistd.h>
+    #include <pwd.h>
+    #include <unistd.h>
 #endif
 
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
@@ -356,7 +357,7 @@ int decrypt_file(const char *filename, int stream,
     int entype;
     struct beast_ops *encrypt_ops;
     int retval = -1;
-	int n = 0;
+    int n = 0;
 
     *free_buffer = 0; /* set free buffer flag to false */
 
@@ -387,7 +388,7 @@ int decrypt_file(const char *filename, int stream,
      * 3) 1 int is encrypt type.
      */
     headerlen = encrypt_file_header_length + INT_SIZE * 3;
-	if ((n = read(stream, header, headerlen)) != headerlen) {
+    if ((n = read(stream, header, headerlen)) != headerlen) {
         beast_write_log(beast_log_error,
                         "Failed to readed header from file `%s', headerlen:%d, readlen:%d", filename, headerlen, n);
         retval = -1;
@@ -524,6 +525,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     int retval;
     struct beast_ops *ops = NULL;
     int destroy_file_handler = 0;
+
 
 	filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
      if (filep != NULL) {
@@ -886,7 +888,7 @@ PHP_INI_END()
 void segmentfault_deadlock_fix(int sig)
 {
 #ifdef PHP_WIN32 // windows not support backtrace
-	beast_write_log(beast_log_error, "Segmentation fault and fix deadlock");
+    beast_write_log(beast_log_error, "Segmentation fault and fix deadlock");
 #else
     void *array[10] = {0};
     size_t size;
@@ -915,7 +917,7 @@ void segmentfault_deadlock_fix(int sig)
 static char *get_mac_address(char *networkcard)
 {
 #ifdef PHP_WIN32
-
+  
 	// For windows
 	ULONG size = sizeof(IP_ADAPTER_INFO);
 	int ret, i;
@@ -962,12 +964,12 @@ static char *get_mac_address(char *networkcard)
 
 #else
 
-	// For linux / unix
-	char netfile[128] = { 0 }, cmd[128] = { 0 }, buf[128] = { 0 };
-	FILE *fp;
-	char *retbuf, *curr, *last;
+    // For linux / unix
+    char netfile[128] = { 0 }, cmd[128] = { 0 }, buf[128] = { 0 };
+    FILE *fp;
+    char *retbuf, *curr, *last;
 
-	snprintf(netfile, 128, "/sys/class/net/%s/address", networkcard);
+    snprintf(netfile, 128, "/sys/class/net/%s/address", networkcard);
 
     if (access((const char *)netfile, R_OK) != 0) { /* File not exists */
         return NULL;
@@ -975,88 +977,86 @@ static char *get_mac_address(char *networkcard)
 
     snprintf(cmd, 128, "cat %s", netfile);
 
-	fp = popen(cmd, "r");
-	if (!fp) {
-		return NULL;
-	}
+    fp = popen(cmd, "r");
+    if (!fp) {
+        return NULL;
+    }
 
-	retbuf = fgets(buf, 128, fp);
+    retbuf = fgets(buf, 128, fp);
 
-	for (curr = buf, last = NULL; *curr; curr++) {
-		if (*curr != '\n') {
-			last = curr;
-		}
-	}
+    for (curr = buf, last = NULL; *curr; curr++) {
+        if (*curr != '\n') {
+            last = curr;
+        }
+    }
 
-	if (!last) {
-		return NULL;
-	}
+    if (!last) {
+        return NULL;
+    }
 
-	for (last += 1; *last; last++) {
-		*last = '\0';
-	}
+    for (last += 1; *last; last++) {
+        *last = '\0';
+    }
 
-	pclose(fp);
+    pclose(fp);
 
-	return strdup(buf);
+    return strdup(buf);
 
 #endif
 }
 
 static int validate_networkcard()
 {
-	extern char *allow_networkcards[];
-	char **ptr;
-	char *networkcard_start, *networkcard_end;
-	int endof_networkcard = 0;
-	int active = 0;
-	char *address;
+    extern char *allow_networkcards[];
+    char **ptr;
+    char *networkcard_start, *networkcard_end;
+    int endof_networkcard = 0;
+    int active = 0;
+    char *address;
 
-	for (ptr = allow_networkcards; *ptr; ptr++, active++);
+    for (ptr = allow_networkcards; *ptr; ptr++, active++);
 
-	if (!active) {
-		return 0;
-	}
+    if (!active) {
+        return 0;
+    }
 
-	networkcard_start = networkcard_end = local_networkcard;
+    networkcard_start = networkcard_end = local_networkcard;
 
-	while (1) {
-		while (*networkcard_end && *networkcard_end != ',') {
-			networkcard_end++;
-		}
+    while (1) {
+        while (*networkcard_end && *networkcard_end != ',') {
+            networkcard_end++;
+        }
 
-		if (networkcard_start == networkcard_end) { /* empty string */
-			break;
-		}
+        if (networkcard_start == networkcard_end) { /* empty string */
+            break;
+        }
 
-		if (*networkcard_end == ',') {
-			*networkcard_end = '\0';
-		}
-		else {
-			endof_networkcard = 1;
-		}
+        if (*networkcard_end == ',') {
+            *networkcard_end = '\0';
+        }
+        else {
+            endof_networkcard = 1;
+        }
 
-		address = get_mac_address(networkcard_start);
-		if (!address) {
-			return -1;
-		}
+        address = get_mac_address(networkcard_start);
+        if (address) {
+            for (ptr = allow_networkcards; *ptr; ptr++) {
+                if (!strcasecmp(address, *ptr)) {
+                    free(address); /* release buffer */
+                    return 0;
+                }
+            }
+            free(address);
+        }
 
-		for (ptr = allow_networkcards; *ptr; ptr++) {
-			if (!strcasecmp(address, *ptr)) {
-				free(address); /* release buffer */
-				return 0;
-			}
-		}
-		free(address);
+        if (endof_networkcard) {
+            break;
+        }
 
-		if (endof_networkcard) {
-			break;
-		}
+        networkcard_start = networkcard_end + 1;
+    }
 
-		networkcard_start = networkcard_end + 1;
-	}
-
-	return -1;
+    return -1;
 }
 
 /* {{{ PHP_MINIT_FUNCTION
@@ -1065,7 +1065,7 @@ PHP_MINIT_FUNCTION(beast)
 {
     int i;
 #ifdef PHP_WIN32
-	SYSTEM_INFO info;
+    SYSTEM_INFO info;
 #endif
 
     /* If you have INI entries, uncomment these lines */
@@ -1140,10 +1140,10 @@ PHP_MINIT_FUNCTION(beast)
     old_compile_file = zend_compile_file;
     zend_compile_file = cgi_compile_file;
 #ifdef PHP_WIN32
-	GetSystemInfo(&info);
-	beast_ncpu = info.dwNumberOfProcessors;
+    GetSystemInfo(&info);
+    beast_ncpu = info.dwNumberOfProcessors;
 #else
-	beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
+    beast_ncpu = sysconf(_SC_NPROCESSORS_ONLN); /* Get CPU nums */
 #endif
     if (beast_ncpu <= 0) {
         beast_ncpu = 1;
