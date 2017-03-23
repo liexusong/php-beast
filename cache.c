@@ -36,9 +36,15 @@ static cache_item_t **beast_cache_buckets = NULL;
 static beast_atomic_t *cache_lock;
 extern int beast_pid;
 
-#define beast_cache_lock()    beast_spinlock(cache_lock, beast_pid)
-#define beast_cache_unlock()  beast_spinunlock(cache_lock, beast_pid)
+inline void beast_cache_lock()
+{
+    beast_spinlock(cache_lock, beast_pid);
+}
 
+inline void beast_cache_unlock()
+{
+    beast_spinunlock(cache_lock, beast_pid);
+}
 
 static inline unsigned int
 beast_cache_hash(cache_key_t *key)
@@ -140,8 +146,8 @@ cache_item_t *beast_cache_find(cache_key_t *key)
 
 cache_item_t *beast_cache_create(cache_key_t *key)
 {
-    cache_item_t *item, *next;
-    int i, msize, bsize;
+    cache_item_t *item;
+    int msize, bsize;
 
     msize = sizeof(*item) + key->fsize;
     bsize = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
@@ -181,7 +187,6 @@ cache_item_t *beast_cache_push(cache_item_t *item)
 {
     unsigned int hashval = beast_cache_hash(&item->key);
     unsigned int index = hashval % BUCKETS_DEFAULT_SIZE;
-    cache_item_t **this, *self;
 
     beast_cache_lock();
 
@@ -196,9 +201,6 @@ cache_item_t *beast_cache_push(cache_item_t *item)
 
 int beast_cache_destroy()
 {
-    int index;
-    cache_item_t *item, *next;
-
     if (!beast_cache_initialization) {
         return 0;
     }

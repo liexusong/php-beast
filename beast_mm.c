@@ -48,8 +48,15 @@ static int beast_mm_block_size = 0;
 static beast_atomic_t *mm_lock;
 extern int beast_pid;
 
-#define beast_mm_lock()    beast_spinlock(mm_lock, beast_pid)
-#define beast_mm_unlock()  beast_spinunlock(mm_lock, beast_pid)
+inline void beast_mm_lock()
+{
+    beast_spinlock(mm_lock, beast_pid);
+}
+
+inline void beast_mm_unlock()
+{
+    beast_spinunlock(mm_lock, beast_pid);
+}
 
 
 /*
