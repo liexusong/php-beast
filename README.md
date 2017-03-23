@@ -9,14 +9,10 @@
 @imaben (windows版本提供者)  https://github.com/imaben
 @pinguo-niulingyun (PHP7版本提供者) https://github.com/pinguo-niulingyun
 
+QQ交流群：239243332
 </pre>
 
-<pre>
-此模块可以用于商业用途, 版权归原作者.<br/>
-QQ交流群：239243332<br/>
-<b>安装此扩展必须使用非线程安全版本，否则可能出错！！！</b>
-<b>Windows DLL<a href="https://github.com/imaben/php-beast-binaries">下载地址</a></b>
-</pre>
+<b>Windows DLL：<a href="https://github.com/imaben/php-beast-binaries">下载地址</a></b>
 
 <b>php-beast可以自定义加密模块，加密模块编写教程: <a href="https://github.com/liexusong/php-beast/wiki/%E5%8A%A0%E5%AF%86%E6%A8%A1%E5%9D%97%E7%BC%96%E5%86%99%E6%95%99%E7%A8%8B">点击</a></b>
 
