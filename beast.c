@@ -531,12 +531,12 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     int destroy_file_handler = 0;
 
 
-	filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
-     if (filep != NULL) {
-         fd = fileno(filep);
-     } else {
+    filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+    if (filep != NULL) {
+        fd = fileno(filep);
+    } else {
         goto final;
-     }
+    }
 
     retval = decrypt_file(h->filename, fd, &buf, &size,
                           &free_buffer, &ops TSRMLS_CC);
@@ -922,49 +922,49 @@ static char *get_mac_address(char *networkcard)
 {
 #ifdef PHP_WIN32
 
-	// For windows
-	ULONG size = sizeof(IP_ADAPTER_INFO);
-	int ret, i;
-	char *address = NULL;
-	char buf[128] = { 0 }, *pos;
+    // For windows
+    ULONG size = sizeof(IP_ADAPTER_INFO);
+    int ret, i;
+    char *address = NULL;
+    char buf[128] = { 0 }, *pos;
 
-	PIP_ADAPTER_INFO pCurrentAdapter = NULL;
-	PIP_ADAPTER_INFO pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(sizeof(*pIpAdapterInfo));
-	if (!pIpAdapterInfo) {
-		beast_write_log(beast_log_error, "Failed to allocate memory for IP_ADAPTER_INFO");
-		return NULL;
-	}
+    PIP_ADAPTER_INFO pCurrentAdapter = NULL;
+    PIP_ADAPTER_INFO pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(sizeof(*pIpAdapterInfo));
+    if (!pIpAdapterInfo) {
+        beast_write_log(beast_log_error, "Failed to allocate memory for IP_ADAPTER_INFO");
+        return NULL;
+    }
 
-	ret = GetAdaptersInfo(pIpAdapterInfo, &size);
-	if (ERROR_BUFFER_OVERFLOW == ret) {
-		// see ERROR_BUFFER_OVERFLOW https://msdn.microsoft.com/en-us/library/aa365917(VS.85).aspx
-		free(pIpAdapterInfo);
-		pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(size);
+    ret = GetAdaptersInfo(pIpAdapterInfo, &size);
+    if (ERROR_BUFFER_OVERFLOW == ret) {
+        // see ERROR_BUFFER_OVERFLOW https://msdn.microsoft.com/en-us/library/aa365917(VS.85).aspx
+        free(pIpAdapterInfo);
+        pIpAdapterInfo = (PIP_ADAPTER_INFO)malloc(size);
 
-		ret = GetAdaptersInfo(pIpAdapterInfo, &size);
-	}
+        ret = GetAdaptersInfo(pIpAdapterInfo, &size);
+    }
 
-	if (ERROR_SUCCESS != ret) {
-		beast_write_log(beast_log_error, "Failed to get network adapter information");
-		free(pIpAdapterInfo);
-		return NULL;
-	}
+    if (ERROR_SUCCESS != ret) {
+        beast_write_log(beast_log_error, "Failed to get network adapter information");
+        free(pIpAdapterInfo);
+        return NULL;
+    }
 
-	pCurrentAdapter = pIpAdapterInfo;
-	do {
-		if (strcmp(pCurrentAdapter->AdapterName, networkcard) == 0) {
-			for (i = 0, pos = buf; i < pCurrentAdapter->AddressLength; i++, pos += 3) {
-				sprintf(pos, "%.2X-", (int)pCurrentAdapter->Address[i]);
-			}
-			*(--pos) = '\0'; // remove last -
-			address = strdup(buf);
-			break;
-		}
-		pCurrentAdapter = pCurrentAdapter->Next;
-	} while (pCurrentAdapter);
+    pCurrentAdapter = pIpAdapterInfo;
+    do {
+        if (strcmp(pCurrentAdapter->AdapterName, networkcard) == 0) {
+            for (i = 0, pos = buf; i < pCurrentAdapter->AddressLength; i++, pos += 3) {
+                sprintf(pos, "%.2X-", (int)pCurrentAdapter->Address[i]);
+            }
+            *(--pos) = '\0'; // remove last -
+            address = strdup(buf);
+            break;
+        }
+        pCurrentAdapter = pCurrentAdapter->Next;
+    } while (pCurrentAdapter);
 
-	free(pIpAdapterInfo);
-	return address;
+    free(pIpAdapterInfo);
+    return address;
 
 #else
 
@@ -1361,6 +1361,6 @@ PHP_FUNCTION(beast_support_filesize)
  * tab-width: 4
  * c-basic-offset: 4
  * End:
- * vim600: noet sw=4 ts=4 fdm=marker
+ * vim600: noet sw=4 ts=4 fdm=marker expandtab
  * vim<600: noet sw=4 ts=4
  */
