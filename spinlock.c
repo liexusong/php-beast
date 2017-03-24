@@ -19,50 +19,54 @@
 #include <stdlib.h>
 #include "spinlock.h"
 #ifdef PHP_WIN32
-#include <Windows.h>
-#define __sync_bool_compare_and_swap(lock, o, n) (o == InterlockedExchange(lock, n))
-#define __asm__(c) __asm { pause }
-#define sched_yield() __asm { rep nop } 
+  #include <Windows.h>
 #else
-#include <pthread.h>
+  #include <pthread.h>
 #endif
 #include "beast_log.h"
 
-extern int beast_ncpu;
+#ifdef PHP_WIN32
+  #define compare_and_swap(lock, o, n) \
+      (InterlockedCompareExchange(lock, n, o) == n)
+  #define pause() __asm { pause }
+  #define yield() __asm { rep nop }
+#else
+  #define compare_and_swap(lock, o, n) \
+      __sync_bool_compare_and_swap(lock, o, n)
+  #define pause() __asm__("pause")
+  #define yield() sched_yield()
+#endif
 
+extern int beast_ncpu;
 
 void beast_spinlock(beast_atomic_t *lock, int pid)
 {
     int i, n;
-    for ( ;; ) {
 
-        if (*lock == 0 && 
-            __sync_bool_compare_and_swap(lock, 0, pid)) {
+    for ( ;; ) {
+        if (compare_and_swap(lock, 0, pid)) {
             return;
         }
 
         if (beast_ncpu > 1) {
 
             for (n = 1; n < 129; n << 1) {
-    
+
                 for (i = 0; i < n; i++) {
-                    __asm__("pause");
+                    pause();
                 }
-    
-                if (*lock == 0 && 
-                    __sync_bool_compare_and_swap(lock, 0, pid)) {
+
+                if (compare_and_swap(lock, 0, pid)) {
                     return;
                 }
             }
         }
 
-        sched_yield();
+        yield();
     }
 }
 
-
 void beast_spinunlock(beast_atomic_t *lock, int pid)
 {
-    __sync_bool_compare_and_swap(lock, pid, 0);
+    compare_and_swap(lock, pid, 0);
 }
-
