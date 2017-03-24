@@ -29,20 +29,6 @@
 #include <signal.h>
 #include <time.h>
 
-#ifdef PHP_WIN32
-    #include <WinSock2.h>
-    #include <Iphlpapi.h>
-    #if ZEND_MODULE_API_NO >= 20151012
-        #pragma comment(lib, "php7.lib")
-    #else
-        #pragma comment(lib, "php5.lib")
-    #endif
-    #pragma comment(lib, "Iphlpapi.lib")
-#else
-    #include <pwd.h>
-    #include <unistd.h>
-#endif
-
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
 #include "zend.h"
@@ -66,6 +52,20 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "beast_log.h"
 #include "beast_module.h"
 #include "file_handler.h"
+
+#ifdef PHP_WIN32
+    #include <WinSock2.h>
+    #include <Iphlpapi.h>
+    #if ZEND_MODULE_API_NO >= 20151012
+        #pragma comment(lib, "php7.lib")
+    #else
+        #pragma comment(lib, "php5.lib")
+    #endif
+    #pragma comment(lib, "Iphlpapi.lib")
+#else
+    #include <pwd.h>
+    #include <unistd.h>
+#endif
 
 #if ZEND_MODULE_API_NO >= 20151012
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str)
