@@ -347,8 +347,8 @@ failed:
 *****************************************************************************/
 
 int decrypt_file(const char *filename, int stream,
-    char **retbuf, int *retlen, int *free_buffer,
-    struct beast_ops **ret_encrypt TSRMLS_DC)
+        char **retbuf, int *retlen, int *free_buffer,
+        struct beast_ops **ret_encrypt TSRMLS_DC)
 {
     struct stat stat_ssb;
     cache_key_t findkey;
@@ -362,20 +362,41 @@ int decrypt_file(const char *filename, int stream,
     struct beast_ops *encrypt_ops;
     int retval = -1;
     int n = 0;
+    int filesize = 0;
 
-    *free_buffer = 0; /* set free buffer flag to false */
 
-    if (fstat(stream, &stat_ssb) == -1) {
+#ifdef PHP_WIN32
+    ULARGE_INTEGER ull;
+    BY_HANDLE_FILE_INFORMATION fileinfo;
+    HANDLE hFile = (HANDLE)_get_osfhandle(stream);
+    if (!GetFileInformationByHandle(hFile, &fileinfo)) {
         beast_write_log(beast_log_error,
-                      "Failed to readed state buffer from file `%s'", filename);
+                "Failed to get file information from file `%s'", filename);
         retval = -1;
         goto failed;
     }
+    findkey.device = fileinfo.dwVolumeSerialNumber;
+    findkey.inode = fileinfo.nFileIndexHigh * (MAXDWORD + 1) + fileinfo.nFileIndexLow;
 
+
+    ull.LowPart = fileinfo.ftLastWriteTime.dwLowDateTime;
+    ull.HighPart = fileinfo.ftLastWriteTime.dwHighDateTime;
+
+    findkey.mtime =  ull.QuadPart / 10000000ULL - 11644473600ULL;
+    filesize = fileinfo.nFileSizeHigh * (MAXDWORD + 1) + fileinfo.nFileSizeLow;
+
+#else
+    if (fstat(stream, &stat_ssb) == -1) {
+        beast_write_log(beast_log_error,
+                "Failed to readed state buffer from file `%s'", filename);
+        retval = -1;
+        goto failed;
+    }
     findkey.device = stat_ssb.st_dev;
     findkey.inode = stat_ssb.st_ino;
     findkey.mtime = stat_ssb.st_mtime;
-
+    filesize = stat_ssb.st_size;
+#endif
     cache = beast_cache_find(&findkey);
 
     if (cache != NULL) { /* Found cache */
@@ -383,6 +404,8 @@ int decrypt_file(const char *filename, int stream,
         *retlen = beast_cache_size(cache);
         return 0;
     }
+
+    *free_buffer = 0; /* set free buffer flag to false */
 
     /* not found cache and decrypt file */
 
@@ -394,19 +417,19 @@ int decrypt_file(const char *filename, int stream,
     headerlen = encrypt_file_header_length + INT_SIZE * 3;
     if ((n = read(stream, header, headerlen)) != headerlen) {
         beast_write_log(beast_log_error,
-                        "Failed to readed header from file `%s', headerlen:%d, readlen:%d", filename, headerlen, n);
+                "Failed to readed header from file `%s', headerlen:%d, readlen:%d", filename, headerlen, n);
         retval = -1;
         goto failed;
     }
 
     /* Not a encrypted file */
     if (memcmp(header,
-               encrypt_file_header_sign,
-               encrypt_file_header_length))
+                encrypt_file_header_sign,
+                encrypt_file_header_length))
     {
         if (log_normal_file) {
             beast_write_log(beast_log_error,
-                            "File `%s' isn't a encrypted file", filename);
+                    "File `%s' isn't a encrypted file", filename);
         }
 
         retval = -1;
@@ -427,8 +450,8 @@ int decrypt_file(const char *filename, int stream,
     /* Check file size is vaild */
     if (beast_max_filesize > 0 && reallen > beast_max_filesize) {
         beast_write_log(beast_log_error,
-                        "File size `%d' out of max size `%d'",
-                        reallen, beast_max_filesize);
+                "File size `%d' out of max size `%d'",
+                reallen, beast_max_filesize);
         retval = -1;
         goto failed;
     }
@@ -448,13 +471,13 @@ int decrypt_file(const char *filename, int stream,
      * because we had read the header yet.
      */
 
-    bodylen = stat_ssb.st_size - headerlen;
+    bodylen = filesize - headerlen;
 
     /* 1) Alloc memory for decrypt file */
     if (!(buffer = malloc(bodylen))) {
         beast_write_log(beast_log_error,
-                        "Failed to alloc memory to file `%s' size `%d'",
-                        filename, bodylen);
+                "Failed to alloc memory to file `%s' size `%d'",
+                filename, bodylen);
         retval = -1;
         goto failed;
     }
@@ -462,7 +485,7 @@ int decrypt_file(const char *filename, int stream,
     /* 2) Read file stream */
     if (read(stream, buffer, bodylen) != bodylen) {
         beast_write_log(beast_log_error,
-                        "Failed to readed stream from file `%s'", filename);
+                "Failed to readed stream from file `%s'", filename);
         retval = -1;
         goto failed;
     }
@@ -470,8 +493,8 @@ int decrypt_file(const char *filename, int stream,
     /* 3) Decrypt file stream */
     if (encrypt_ops->decrypt(buffer, bodylen, &decbuf, &declen) == -1) {
         beast_write_log(beast_log_error,
-                        "Failed to decrypted file `%s', using `%s' handler",
-                        filename, encrypt_ops->name);
+                "Failed to decrypted file `%s', using `%s' handler",
+                filename, encrypt_ops->name);
         retval = -1;
         goto failed;
     }
@@ -509,6 +532,8 @@ failed:
 
     return retval;
 }
+
+
 
 
 /*
