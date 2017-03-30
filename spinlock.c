@@ -28,8 +28,8 @@
 #ifdef PHP_WIN32
   #define compare_and_swap(lock, o, n) \
       (InterlockedCompareExchange(lock, n, o) == n)
-  #define pause() __asm { pause }
-  #define yield() __asm { rep nop }
+  #define pause() YieldProcessor()
+  #define yield() SwitchToThread()
 #else
   #define compare_and_swap(lock, o, n) \
       __sync_bool_compare_and_swap(lock, o, n)
