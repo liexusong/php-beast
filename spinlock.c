@@ -33,7 +33,11 @@
 #else
   #define compare_and_swap(lock, o, n) \
       __sync_bool_compare_and_swap(lock, o, n)
-  #define pause() __asm__("pause")
+  #ifdef __arm__
+    #define pause() __asm__("NOP");
+  #else
+    #define pause() __asm__("pause")
+  #endif
   #define yield() sched_yield()
 #endif
 
