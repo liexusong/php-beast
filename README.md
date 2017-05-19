@@ -113,6 +113,11 @@ char *allow_networkcards[] = {
 
 ------------------------------
 
+## 开启debug模式
+可以在configure时加入 `--enable-beast-debug` 选项来开启debug模式。开启debug模式后需要在php.ini配置文件中加入配置项：`beast.debug_path` 和 `beast.debug_mode`。`beast.debug_mode` 用于指定是否使用debug模式，而 `beast.debug_path` 用于输出解密后的php脚本源码。这样就可以在 `beast.debug_path` 目录中看到php-beast解密后的源代码，可以方便知道扩展解密是否正确。
+
+------------------------------
+
 作者: liexusong(280259971@qq.com)。
 
 <b>my book:《<a href="http://book.jd.com/11123177.html">PHP核心技术与最佳实践</a>》</b>此书有详细的PHP扩展编写教程<br/>

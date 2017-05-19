@@ -17,8 +17,18 @@ PHP_ARG_ENABLE(beast, whether to enable beast support,
 dnl Make sure that the comment is aligned:
 [  --enable-beast           Enable beast support])
 
+PHP_ARG_ENABLE(beast-debug, whether to enable beast debug mode,
+dnl Make sure that the comment is aligned:
+[  --enable-beast-debug     Enable beast debug mode], no, no)
+
 if test "$PHP_BEAST" != "no"; then
   dnl Write more examples of tests here...
+
+  if test "$PHP_BEAST_DEBUG" != "yes"; then
+    AC_DEFINE(BEAST_DEBUG_MODE, 0, [ ])
+  else
+    AC_DEFINE(BEAST_DEBUG_MODE, 1, [ ])
+  fi
 
   dnl # --with-beast -> check with-path
   dnl SEARCH_PATH="/usr/local /usr"     # you might want to change this

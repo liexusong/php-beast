@@ -100,6 +100,8 @@ static int beast_max_filesize = 0;
 static char *local_networkcard = NULL;
 static int beast_now_time = 0;
 static int log_normal_file = 0;
+static char *beast_debug_path = NULL;
+static int beast_debug_mode = 0;
 
 /* {{{ beast_functions[]
  *
@@ -534,6 +536,36 @@ failed:
 }
 
 
+int beast_super_mkdir(char *path)
+{
+    char *head, *last;
+    char temp[1024];
+
+    for (head = last = path; *last; last++) {
+
+        if (*last == '/') {
+
+            if (last > head) {
+
+                memset(temp, 0, 1024);
+                memcpy(temp, path, last - path);
+
+                if (access(temp, F_OK) == -1) {
+                    if (mkdir(temp, 0777) != 0) {
+                        beast_write_log(beast_log_error,
+                                        "Failed to make new directory `%s'",
+                                        temp);
+                        return -1;
+                    }
+                }
+            }
+
+            head = last + 1;
+        }
+    }
+
+    return 0;
+}
 
 
 /*
@@ -570,6 +602,30 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
             "This program was expired, please contact administrator");
         return NULL;
     }
+
+#if BEAST_DEBUG_MODE
+
+    if (beast_debug_mode && beast_debug_path) {
+
+        if (access(beast_debug_path, F_OK) == 0) {
+
+            char *realpath[1024];
+
+            sprintf(realpath, "%s/%s", beast_debug_path, h->filename);
+
+            if (beast_super_mkdir(realpath) == 0) {
+
+                FILE *debug_fp = fopen(realpath, "w+");
+
+                if (debug_fp) {
+                    fwrite(buf, 1, size, debug_fp);
+                    fclose(debug_fp);
+                }
+            }
+        }
+    }
+
+#endif
 
     if (retval == -1 ||
         default_file_handler->open(default_file_handler) == -1 ||
@@ -896,6 +952,76 @@ ZEND_INI_MH(php_beast_set_log_normal_file)
 }
 
 
+ZEND_INI_MH(php_beast_debug_path)
+{
+    #if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
+        return SUCCESS;
+    }
+
+    beast_debug_path = estrdup(ZSTR_VAL(new_value));
+    if (beast_debug_path == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+
+#else
+
+    if (new_value_length == 0) {
+        return SUCCESS;
+    }
+
+    beast_debug_path = strdup(new_value);
+    if (beast_debug_path == NULL) {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+
+#endif
+}
+
+
+ZEND_INI_MH(php_beast_debug_mode)
+{
+    #if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
+        return FAILURE;
+    }
+
+    if (!strcasecmp(ZSTR_VAL(new_value), "on")
+        || !strcmp(ZSTR_VAL(new_value), "1"))
+    {
+        beast_debug_mode = 1;
+    } else {
+        beast_debug_mode = 0;
+    }
+
+    return SUCCESS;
+
+#else
+
+    if (new_value_length == 0) {
+        return FAILURE;
+    }
+
+    if (!strcasecmp(new_value, "on")
+        || !strcmp(new_value, "1"))
+    {
+        beast_debug_mode = 1;
+    } else {
+        beast_debug_mode = 0;
+    }
+
+    return SUCCESS;
+
+#endif
+}
+
+
 PHP_INI_BEGIN()
     PHP_INI_ENTRY("beast.cache_size", "10485760", PHP_INI_ALL,
           php_beast_cache_size)
@@ -909,6 +1035,12 @@ PHP_INI_BEGIN()
           php_beast_set_networkcard)
     PHP_INI_ENTRY("beast.log_normal_file", "0", PHP_INI_ALL,
           php_beast_set_log_normal_file)
+#if BEAST_DEBUG_MODE
+    PHP_INI_ENTRY("beast.debug_path", "/tmp", PHP_INI_ALL,
+          php_beast_debug_path)
+    PHP_INI_ENTRY("beast.debug_mode", "0", PHP_INI_ALL,
+          php_beast_debug_mode)
+#endif
 PHP_INI_END()
 
 /* }}} */
