@@ -7,7 +7,13 @@ ARG_WITH("beast", "for beast support", "yes,shared");
 
 ARG_ENABLE("beast", "enable beast support", "yes,shared");
 
+ARG_ENABLE("beast-debug", "enable beast debug mode", "no");
+
 if (PHP_BEAST != "no") {
+	if (PHP_BEAST_DEBUG != "no") {
+		AC_DEFINE('BEAST_DEBUG_MODE', 1, 'Debug support in beast');
+	}
+	
 	EXTENSION("beast", "beast.c aes_algo_handler.c des_algo_handler.c base64_algo_handler.c beast_mm.c spinlock.c cache.c beast_log.c global_algo_modules.c header.c networkcards.c tmpfile_file_handler.c file_handler_switch.c shm.c", true);
 }
 
