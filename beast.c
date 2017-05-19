@@ -602,6 +602,16 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         return NULL;
     }
 
+    if (retval == -1 ||
+        default_file_handler->open(default_file_handler) == -1 ||
+        default_file_handler->write(default_file_handler, buf, size) == -1 ||
+        default_file_handler->rewind(default_file_handler) == -1)
+    {
+        if (retval != -1)
+            destroy_file_handler = 1;
+        goto final;
+    }
+
 #if BEAST_DEBUG_MODE
 
     if (beast_debug_mode && beast_debug_path) {
@@ -617,7 +627,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
                 FILE *debug_fp = fopen(realpath, "w+");
 
                 if (debug_fp) {
-                    fwrite(buf, 1, size, debug_fp);
+                    fwrite(buf, size, 1, debug_fp);
                     fclose(debug_fp);
                 }
             }
@@ -625,15 +635,6 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     }
 
 #endif
-
-    if (retval == -1 ||
-        default_file_handler->open(default_file_handler) == -1 ||
-        default_file_handler->write(default_file_handler, buf, size) == -1 ||
-        default_file_handler->rewind(default_file_handler) == -1)
-    {
-        destroy_file_handler = 1;
-        goto final;
-    }
 
     if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
     if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
@@ -1512,6 +1513,7 @@ PHP_FUNCTION(beast_support_filesize)
     RETURN_LONG(beast_max_filesize);
 }
 
+
 /*
  * Local variables:
  * tab-width: 4
@@ -1520,3 +1522,4 @@ PHP_FUNCTION(beast_support_filesize)
  * vim600: noet sw=4 ts=4 fdm=marker expandtab
  * vim<600: noet sw=4 ts=4
  */
+
