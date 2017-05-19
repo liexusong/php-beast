@@ -587,7 +587,6 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     struct beast_ops *ops = NULL;
     int destroy_file_handler = 0;
 
-
     filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
     if (filep != NULL) {
         fd = fileno(filep);
@@ -609,7 +608,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 
         if (access(beast_debug_path, F_OK) == 0) {
 
-            char *realpath[1024];
+            char realpath[1024];
 
             sprintf(realpath, "%s/%s", beast_debug_path, h->filename);
 
