@@ -581,15 +581,15 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 #endif
     char *buf;
     int fd;
-    FILE *filep = NULL;
+    FILE *fp = NULL;
     int size, free_buffer = 0;
     int retval;
     struct beast_ops *ops = NULL;
     int destroy_file_handler = 0;
 
-    filep = zend_fopen(h->filename, &opened_path TSRMLS_CC);
-    if (filep != NULL) {
-        fd = fileno(filep);
+    fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+    if (fp != NULL) {
+        fd = fileno(fp);
     } else {
         goto final;
     }
@@ -602,15 +602,7 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         return NULL;
     }
 
-    if (retval == -1 ||
-        default_file_handler->open(default_file_handler) == -1 ||
-        default_file_handler->write(default_file_handler, buf, size) == -1 ||
-        default_file_handler->rewind(default_file_handler) == -1)
-    {
-        if (retval != -1)
-            destroy_file_handler = 1;
-        goto final;
-    }
+    if (retval == -1) goto final;  /* Using old_compile_file() */
 
 #if BEAST_DEBUG_MODE
 
@@ -636,6 +628,14 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
 
 #endif
 
+    if (default_file_handler->open(default_file_handler) == -1 ||
+        default_file_handler->write(default_file_handler, buf, size) == -1 ||
+        default_file_handler->rewind(default_file_handler) == -1)
+    {
+        destroy_file_handler = 1;
+        goto final;
+    }
+
     if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
     if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
 
@@ -660,9 +660,7 @@ final:
         }
     }
 
-    if (filep) {
-        fclose(filep);
-    }
+    if (fp) fclose(fp);
 
     if (destroy_file_handler) {
         default_file_handler->destroy(default_file_handler);
@@ -1513,7 +1511,6 @@ PHP_FUNCTION(beast_support_filesize)
     RETURN_LONG(beast_max_filesize);
 }
 
-
 /*
  * Local variables:
  * tab-width: 4
@@ -1522,4 +1519,3 @@ PHP_FUNCTION(beast_support_filesize)
  * vim600: noet sw=4 ts=4 fdm=marker expandtab
  * vim<600: noet sw=4 ts=4
  */
-
