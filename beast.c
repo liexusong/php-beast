@@ -367,7 +367,6 @@ int decrypt_file(const char *filename, int stream,
     int n = 0;
     int filesize = 0;
 
-
 #ifdef PHP_WIN32
     ULARGE_INTEGER ull;
     BY_HANDLE_FILE_INFORMATION fileinfo;
@@ -400,6 +399,19 @@ int decrypt_file(const char *filename, int stream,
     findkey.mtime = stat_ssb.st_mtime;
     filesize = stat_ssb.st_size;
 #endif
+
+    /**
+     * 1) 1 int is dump length,
+     * 2) 1 int is expire time.
+     * 3) 1 int is encrypt type.
+     */
+    headerlen = encrypt_file_header_length + INT_SIZE * 3;
+
+    if (filesize < headerlen) { /* This file is not a encrypt file */
+        retval = -1;
+        goto failed;
+    }
+
     cache = beast_cache_find(&findkey);
 
     if (cache != NULL) { /* Found cache */
@@ -412,12 +424,6 @@ int decrypt_file(const char *filename, int stream,
 
     /* not found cache and decrypt file */
 
-    /**
-     * 1) 1 int is dump length,
-     * 2) 1 int is expire time.
-     * 3) 1 int is encrypt type.
-     */
-    headerlen = encrypt_file_header_length + INT_SIZE * 3;
     if ((n = read(stream, header, headerlen)) != headerlen) {
         beast_write_log(beast_log_error,
                 "Failed to readed header from file `%s', headerlen:%d, readlen:%d", filename, headerlen, n);
@@ -427,12 +433,12 @@ int decrypt_file(const char *filename, int stream,
 
     /* Not a encrypted file */
     if (memcmp(header,
-                encrypt_file_header_sign,
-                encrypt_file_header_length))
+               encrypt_file_header_sign,
+               encrypt_file_header_length))
     {
         if (log_normal_file) {
             beast_write_log(beast_log_error,
-                    "File `%s' isn't a encrypted file", filename);
+                            "File `%s' isn't a encrypted file", filename);
         }
 
         retval = -1;
