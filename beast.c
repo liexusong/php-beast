@@ -23,6 +23,7 @@
 #include "config.h"
 #endif
 
+#include <execinfo.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -1435,7 +1436,7 @@ PHP_FUNCTION(beast_file_expire)
     }
 
     if (expire > 0) {
-        string = php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
+        string = (char *)php_format_date(format, strlen(format), expire, 1 TSRMLS_CC);
         BEAST_RETURN_STRING(string, 0);
     } else {
         BEAST_RETURN_STRING("+Infinity", 1);
