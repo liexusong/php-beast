@@ -74,6 +74,10 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str, dup)
 #endif
 
+#ifdef ZTS
+#error php-beast does't not support zts version
+#endif
+
 #define BEAST_VERSION       "2.6"
 #define DEFAULT_CACHE_SIZE  10485760   /* 10MB */
 #define HEADER_MAX_SIZE     256
