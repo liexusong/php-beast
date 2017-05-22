@@ -75,7 +75,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #endif
 
 #ifdef ZTS
-#error php-beast does't not support zts version
+#error php-beast do not support ZTS mode
 #endif
 
 #define BEAST_VERSION       "2.6"
@@ -424,9 +424,9 @@ int decrypt_file(const char *filename, int stream,
         return 0;
     }
 
-    *free_buffer = 0; /* set free buffer flag to false */
+    *free_buffer = 0; /* Set free buffer flag to false */
 
-    /* not found cache and decrypt file */
+    /*  Not found cache and decrypt file */
 
     if ((n = read(stream, header, headerlen)) != headerlen) {
         beast_write_log(beast_log_error,
@@ -449,7 +449,7 @@ int decrypt_file(const char *filename, int stream,
         goto failed;
     }
 
-    /* real php script file's size */
+    /* Real php script file's size */
     reallen = *((int *)&header[encrypt_file_header_length]);
     expire  = *((int *)&header[encrypt_file_header_length + INT_SIZE]);
     entype  = *((int *)&header[encrypt_file_header_length + 2 * INT_SIZE]);
@@ -479,7 +479,7 @@ int decrypt_file(const char *filename, int stream,
     *ret_encrypt = encrypt_ops = beast_get_encrypt_algo(entype);
 
     /**
-     * how many bytes would be read from encrypt file,
+     * How many bytes would be read from encrypt file,
      * subtract encrypt file's header size,
      * because we had read the header yet.
      */
@@ -512,16 +512,16 @@ int decrypt_file(const char *filename, int stream,
         goto failed;
     }
 
-    free(buffer); /* buffer don't need right now and free it */
+    free(buffer); /* Buffer don't need right now and free it */
 
-    findkey.fsize = reallen;
+    findkey.fsize = reallen; /* How many size would we alloc from cache */
 
-    /* try add decrypt result to cache */
+    /* Try to add decrypt result to cache */
     if ((cache = beast_cache_create(&findkey))) {
 
         memcpy(beast_cache_data(cache), decbuf, reallen);
 
-        cache = beast_cache_push(cache); /* push cache into hash table */
+        cache = beast_cache_push(cache); /* Push cache into hash table */
 
         *retbuf = beast_cache_data(cache);
         *retlen = beast_cache_size(cache);
@@ -530,9 +530,11 @@ int decrypt_file(const char *filename, int stream,
             encrypt_ops->free(decbuf);
         }
 
-    } else {
+    } else {  /* Return raw buffer and we need free after PHP finished */
+
         *retbuf = decbuf;
         *retlen = reallen;
+
         *free_buffer = 1;
     }
 
@@ -1309,6 +1311,7 @@ PHP_MINIT_FUNCTION(beast)
 
     old_compile_file = zend_compile_file;
     zend_compile_file = cgi_compile_file;
+
 #ifdef PHP_WIN32
     GetSystemInfo(&info);
     beast_ncpu = info.dwNumberOfProcessors;
