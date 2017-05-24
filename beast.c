@@ -78,7 +78,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #error php-beast do not support ZTS mode
 #endif
 
-#define BEAST_VERSION       "2.6"
+#define BEAST_VERSION       "2.7"
 #define DEFAULT_CACHE_SIZE  10485760   /* 10MB */
 #define HEADER_MAX_SIZE     256
 #define INT_SIZE            (sizeof(int))
@@ -117,6 +117,7 @@ zend_function_entry beast_functions[] = {
     PHP_FE(beast_avail_cache,      NULL)
     PHP_FE(beast_support_filesize, NULL)
     PHP_FE(beast_file_expire,      NULL)
+    PHP_FE(beast_clean_cache,      NULL)
     {NULL, NULL, NULL}    /* Must be the last line in beast_functions[] */
 };
 /* }}} */
@@ -1523,6 +1524,12 @@ PHP_FUNCTION(beast_avail_cache)
 PHP_FUNCTION(beast_support_filesize)
 {
     RETURN_LONG(beast_max_filesize);
+}
+
+
+PHP_FUNCTION(beast_clean_cache)
+{
+    beast_cache_flush();
 }
 
 /*

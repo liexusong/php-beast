@@ -44,6 +44,7 @@ PHP_FUNCTION(beast_encode_file);
 PHP_FUNCTION(beast_avail_cache);
 PHP_FUNCTION(beast_support_filesize);
 PHP_FUNCTION(beast_file_expire);
+PHP_FUNCTION(beast_clean_cache);
 
 /*
   	Declare any global variables you may need between the BEGIN

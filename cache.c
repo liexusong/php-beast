@@ -29,7 +29,7 @@
 #include "beast_log.h"
 #include "shm.h"
 
-#define BUCKETS_DEFAULT_SIZE 1021
+#define BUCKETS_DEFAULT_SIZE 8191
 
 static int beast_cache_initialization = 0;
 static cache_item_t **beast_cache_buckets = NULL;
@@ -205,9 +205,9 @@ int beast_cache_destroy()
         return 0;
     }
 
-    beast_mm_destroy(); /* destroy memory manager */
+    beast_mm_destroy(); /* Destroy memory manager */
 
-    /* free cache buckets's mmap memory */
+    /* Free cache buckets's mmap memory */
     beast_shm_free((void *)beast_cache_buckets,
             sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE);
     beast_shm_free((void *)cache_lock, sizeof(int));
@@ -234,6 +234,23 @@ void beast_cache_info(zval *retval)
             item = item->next;
         }
     }
+
+    beast_cache_unlock();
+}
+
+void beast_cache_flush()
+{
+    int index;
+
+    beast_cache_lock();
+
+    /* Clean hash buckets */
+    for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
+        beast_cache_buckets[index] = NULL;
+    }
+
+    /* Clean share memory */
+    beast_mm_flush();
 
     beast_cache_unlock();
 }
