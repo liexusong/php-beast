@@ -118,6 +118,19 @@ char *allow_networkcards[] = {
 
 ------------------------------
 
+## 函数列表
+*1.* beast_encode_file(): 用于加密一个文件
+
+*2.* beast_avail_cache(): 获取可以缓存大小
+
+*3.* beast_support_filesize(): 获取beast支持的最大可加密文件大小
+
+*4.* beast_file_expire(): 获取一个文件的过期时间
+
+*5.* beast_clean_cache(): 清空beast的所有缓存(如果有文件更新, 可以使用此函数清空缓存)
+
+------------------------------
+
 作者: liexusong(280259971@qq.com)。
 
 <b>my book:《<a href="http://book.jd.com/11123177.html">PHP核心技术与最佳实践</a>》</b>此书有详细的PHP扩展编写教程<br/>
