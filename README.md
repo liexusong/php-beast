@@ -57,7 +57,9 @@ $ sudo make && make install
 </code></pre>
 
 <h3>注意</h3>
-如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
+*1.* 如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
+
+*2.* 如果在安装线程安全版本时提示 `error: expected ‘=’, ‘,’, ‘;’, ‘asm’ or ‘__attribute__’ before ‘int’` 错误，可以通过修改php_global.h头文件的 `extern PHPAPI int core_globals_id;` 改为 `extern ZEND_API int core_globals_id;`
 
 ------------------------------
 
