@@ -74,15 +74,10 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 # define BEAST_RETURN_STRING(str, dup) RETURN_STRING(str, dup)
 #endif
 
-#ifdef ZTS
-#error php-beast do not support ZTS mode
-#endif
-
 #define BEAST_VERSION       "2.7"
 #define DEFAULT_CACHE_SIZE  10485760   /* 10MB */
 #define HEADER_MAX_SIZE     256
 #define INT_SIZE            (sizeof(int))
-
 
 extern struct beast_ops *ops_handler_list[];
 
@@ -181,7 +176,7 @@ static int big_endian()
 }
 
 
-int filter_code_comments(char *filename, zval *retval)
+int filter_code_comments(char *filename, zval *retval TSRMLS_DC)
 {
     zend_lex_state original_lex_state;
     zend_file_handle file_handle = {0};
@@ -269,9 +264,9 @@ int encrypt_file(const char *inputfile,
     struct beast_ops *encrypt_ops = beast_get_encrypt_algo(encrypt_type);
 
     /* Get php codes from script file */
-    if (filter_code_comments((char *)inputfile, &codes) == -1) {
+    if (filter_code_comments((char *)inputfile, &codes TSRMLS_CC) == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                              "Unable get codes from php file `%s'", inputfile);
+                         "Unable get codes from php file `%s'", inputfile);
         return -1;
     }
 
