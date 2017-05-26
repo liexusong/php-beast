@@ -1,7 +1,23 @@
+/*
+  +----------------------------------------------------------------------+
+  | PHP Version 5                                                        |
+  +----------------------------------------------------------------------+
+  | Copyright (c) 1997-2007 The PHP Group                                |
+  +----------------------------------------------------------------------+
+  | This source file is subject to version 3.01 of the PHP license,      |
+  | that is bundled with this package in the file LICENSE, and is        |
+  | available through the world-wide-web at the following url:           |
+  | http://www.php.net/license/3_01.txt                                  |
+  | If you did not receive a copy of the PHP license and are unable to   |
+  | obtain it through the world-wide-web, please send a note to          |
+  | license@php.net so we can mail you a copy immediately.               |
+  +----------------------------------------------------------------------+
+  | Author: Liexusong <liexusong@qq.com>                                 |
+  +----------------------------------------------------------------------+
+*/
 
-/* +--------------------------------+
- * | share memory manager algorithm |
- * +--------------------------------+
+/*
+ * The simple share memory manager algorithm
  */
 
 #include <stdlib.h>
@@ -21,26 +37,22 @@
 
 #define BEAST_SEGMENT_DEFAULT_SIZE (256 * 1024)
 
-#define _BLOCKAT(addr, offset)  ((beast_block_t *)((char *)addr + (offset)))
-#define _OFFSET(block, addr)    ((int)(((char *)(block)) - (char *)addr))
+#define BLOCKAT(addr, offset)  ((beast_block_t *)((char *)(addr) + (offset)))
 
 #ifdef max
 #undef max
 #endif
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-
 typedef struct beast_header_s {
     int segsize;    /* size of entire segment */
     int avail;      /* bytes available memorys */
 } beast_header_t;
 
-
 typedef struct beast_block_s {
     int size;       /* size of this block */
     int next;       /* offset in segment of next free block */
 } beast_block_t;
-
 
 static int beast_mm_initialized = 0;
 static void *beast_mm_block = NULL;
@@ -83,6 +95,7 @@ static int beast_mm_allocate(void *shmaddr, int size)
     beast_block_t *prvbestfit;    /* block before best fit */
     int realsize;                 /* actual size of block needed, including header */
     int minsize;                  /* for finding best fit */
+    int offset;
 
     /* Realsize must be aligned to a word boundary on some architectures. */
     realsize = size + beast_mm_alignmem(sizeof(int));
@@ -102,10 +115,10 @@ static int beast_mm_allocate(void *shmaddr, int size)
     prvbestfit = 0;    /* Best block prev's node */
     minsize = INT_MAX;
 
-    prv = _BLOCKAT(shmaddr, sizeof(beast_header_t)); /* Free list header */
+    prv = BLOCKAT(shmaddr, sizeof(beast_header_t)); /* Free list header */
 
     while (prv->next != 0) {
-        cur = _BLOCKAT(shmaddr, prv->next); /* Current active block */
+        cur = BLOCKAT(shmaddr, prv->next); /* Current active block */
         if (cur->size == realsize) {
             prvbestfit = prv;
             break;
@@ -124,7 +137,7 @@ static int beast_mm_allocate(void *shmaddr, int size)
     }
 
     prv = prvbestfit;
-    cur = _BLOCKAT(shmaddr, prv->next);
+    cur = BLOCKAT(shmaddr, prv->next);
 
     /* update the block header */
     header->avail -= realsize;
@@ -142,14 +155,16 @@ static int beast_mm_allocate(void *shmaddr, int size)
         oldsize = cur->size;
         prv->next += realsize;
         cur->size = realsize;
-        nxt = _BLOCKAT(shmaddr, prv->next);
+        nxt = BLOCKAT(shmaddr, prv->next);
         nxt->next = nxtoffset;
         nxt->size = oldsize - realsize;
     }
 
     /* skip size field */
 
-    return _OFFSET(cur, shmaddr) + beast_mm_alignmem(sizeof(int));
+    offset = (char *)cur - (char *)shmaddr;
+
+    return offset + beast_mm_alignmem(sizeof(int));
 }
 
 static int beast_mm_deallocate(void *shmaddr, int offset)
@@ -163,14 +178,14 @@ static int beast_mm_deallocate(void *shmaddr, int offset)
     offset -= beast_mm_alignmem(sizeof(int)); /* Really offset */
 
     /* Find position of new block in free list */
-    prv = _BLOCKAT(shmaddr, sizeof(beast_header_t));
+    prv = BLOCKAT(shmaddr, sizeof(beast_header_t));
 
     while (prv->next != 0 && prv->next < offset) {
-        prv = _BLOCKAT(shmaddr, prv->next);
+        prv = BLOCKAT(shmaddr, prv->next);
     }
 
     /* Insert new block after prv */
-    cur = _BLOCKAT(shmaddr, offset);
+    cur = BLOCKAT(shmaddr, offset);
     cur->next = prv->next;
     prv->next = offset;
 
@@ -186,7 +201,7 @@ static int beast_mm_deallocate(void *shmaddr, int offset)
         cur = prv;
     }
 
-    nxt = _BLOCKAT(shmaddr, cur->next);
+    nxt = BLOCKAT(shmaddr, cur->next);
     if (((char *)cur) + cur->size == (char *) nxt) {
         /* cur and nxt shared an edge, combine them */
         cur->size += nxt->size;
@@ -208,19 +223,19 @@ void beast_mm_reinit()
                     - sizeof(beast_block_t)
                     - beast_mm_alignmem(sizeof(int));
 
-    /* the free list head block node */
-    block = _BLOCKAT(beast_mm_block, sizeof(beast_header_t));
+    /* The free list head block node */
+    block = BLOCKAT(beast_mm_block, sizeof(beast_header_t));
     block->size = 0;
     block->next = sizeof(beast_header_t) + sizeof(beast_block_t);
 
-    /* the avail block */
-    block = _BLOCKAT(beast_mm_block, block->next);
+    /* The avail block */
+    block = BLOCKAT(beast_mm_block, block->next);
     block->size = header->avail;
     block->next = 0;
 }
 
 /*
- * init memory manager
+ * Init memory manager
  */
 int beast_mm_init(int block_size)
 {
@@ -228,7 +243,7 @@ int beast_mm_init(int block_size)
         return 0;
     }
 
-    /* init memory manager lock */
+    /* Init memory manager lock */
     mm_lock = (int *)beast_shm_alloc(sizeof(beast_atomic_t));
     if (!mm_lock) {
         beast_write_log(beast_log_error,
@@ -238,7 +253,7 @@ int beast_mm_init(int block_size)
 
     *mm_lock = 0;
 
-    /* init share memory for beast */
+    /* Init share memory for beast */
     if (block_size < BEAST_SEGMENT_DEFAULT_SIZE) {
         beast_mm_block_size = BEAST_SEGMENT_DEFAULT_SIZE;
     } else {
@@ -339,7 +354,13 @@ int beast_mm_availspace()
  */
 int beast_mm_realspace()
 {
-    return ((beast_header_t *)beast_mm_block)->segsize;
+    int size;
+
+    beast_mm_lock();
+    size = ((beast_header_t *)beast_mm_block)->segsize;
+    beast_mm_unlock();
+
+    return size;
 }
 
 /*

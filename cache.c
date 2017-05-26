@@ -83,6 +83,7 @@ int beast_cache_init(int size)
 
     /* init cache buckets's memory */
     bucket_size = sizeof(cache_item_t *) * BUCKETS_DEFAULT_SIZE;
+
     beast_cache_buckets = (cache_item_t **)beast_shm_alloc(bucket_size);
 
     if (!beast_cache_buckets) {
@@ -244,12 +245,12 @@ void beast_cache_flush()
 
     beast_cache_lock();
 
-    /* Clean hash buckets */
+    /* Flush hash buckets */
     for (index = 0; index < BUCKETS_DEFAULT_SIZE; index++) {
         beast_cache_buckets[index] = NULL;
     }
 
-    /* Clean share memory */
+    /* Flush share memory */
     beast_mm_flush();
 
     beast_cache_unlock();
