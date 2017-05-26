@@ -72,7 +72,7 @@ function encrypt_directory($dir, $new_dir, $expire, $type)
             $infos = explode('.', $file);
 
             if (strtolower($infos[count($infos)-1]) == 'php'
-                && filesize($file) > 0)
+                && filesize($path) > 0)
             {
                 if ($expire > 0) {
                     $result = beast_encode_file($path, $new_path,
