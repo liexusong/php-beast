@@ -71,7 +71,9 @@ function encrypt_directory($dir, $new_dir, $expire, $type)
         } else {
             $infos = explode('.', $file);
 
-            if (strtolower($infos[count($infos)-1]) == 'php') {
+            if (strtolower($infos[count($infos)-1]) == 'php'
+                && filesize($file) > 0)
+            {
                 if ($expire > 0) {
                     $result = beast_encode_file($path, $new_path,
                                                 $expire, $type);
@@ -123,15 +125,13 @@ if (empty($dst_path)
 
 switch ($encrypt_type)
 {
-case 'DES':
-    $entype = BEAST_ENCRYPT_TYPE_DES;
-    break;
 case 'AES':
     $entype = BEAST_ENCRYPT_TYPE_AES;
     break;
 case 'BASE64':
     $entype = BEAST_ENCRYPT_TYPE_BASE64;
     break;
+case 'DES':
 default:
     $entype = BEAST_ENCRYPT_TYPE_DES;
     break;
