@@ -23,7 +23,6 @@
 #include "config.h"
 #endif
 
-#include <execinfo.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -66,6 +65,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #else
     #include <pwd.h>
     #include <unistd.h>
+    #include <execinfo.h>
 #endif
 
 #if ZEND_MODULE_API_NO >= 20151012
