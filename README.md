@@ -53,7 +53,7 @@ $ sudo make && make install
 
 通过测试环境:
 <pre><code>
- Nginx + Fastcgi + (PHP-5.2.x ~ PHP-5.6.x)
+ Nginx + Fastcgi + (PHP-5.2.x ~ PHP-7.1.x)
 </code></pre>
 
 <h3>注意</h3>
