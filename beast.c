@@ -56,11 +56,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #ifdef PHP_WIN32
     #include <WinSock2.h>
     #include <Iphlpapi.h>
-    #if ZEND_MODULE_API_NO >= 20151012
-        #pragma comment(lib, "php7.lib")
-    #else
-        #pragma comment(lib, "php5.lib")
-    #endif
+    #pragma comment(lib, PHP_LIB)
     #pragma comment(lib, "Iphlpapi.lib")
 #else
     #include <pwd.h>
