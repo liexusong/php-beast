@@ -34,13 +34,14 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "zend.h"
 #include "zend_operators.h"
 #include "zend_globals.h"
-#include "php_globals.h"
 #include "zend_language_scanner.h"
 
 #include "zend_API.h"
 #include "zend_compile.h"
 
 #include "php.h"
+#include "php_main.h"
+#include "php_globals.h"
 #include "php_ini.h"
 #include "main/SAPI.h"
 #include "ext/standard/info.h"
