@@ -41,8 +41,16 @@ $ sudo make && make install
  beast.cache_size = size
  beast.log_file = "path_to_log"
  beast.log_user = "user"
+ beast.log_level = "debug"
  beast.enable = On
 </code></pre>
+
+beast.log_level支持参数：
+<pre>
+ 1. DEBUG
+ 2. NOTICE
+ 3. ERROR
+</pre>
 
 支持的模块有：
 <pre>

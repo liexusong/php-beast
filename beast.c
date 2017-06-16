@@ -83,6 +83,7 @@ extern struct beast_ops *ops_handler_list[];
  */
 char *beast_log_file = NULL;
 char *beast_log_user = NULL;
+int log_level = beast_log_notice;
 int beast_ncpu = 1;
 int beast_is_root = 0;
 int beast_pid = -1;
@@ -848,6 +849,43 @@ ZEND_INI_MH(php_beast_log_user)
 #endif
 }
 
+ZEND_INI_MH(php_beast_log_level)
+{
+    char *level = NULL;
+#if ZEND_MODULE_API_NO >= 20151012
+
+    if (ZSTR_LEN(new_value) == 0) {
+        return SUCCESS;
+    }
+
+    level = ZSTR_VAL(new_value);
+
+#else
+
+    if (new_value_length == 0) {
+        return SUCCESS;
+    }
+
+    level = new_value;
+
+#endif
+    if (level == NULL) {
+        return FAILURE;
+    }
+
+    if (strcasecmp(level, "debug") == 0) {
+        log_level = beast_log_debug;
+    } else if (strcasecmp(level, "notice") == 0) {
+        log_level = beast_log_notice;
+    } else if (strcasecmp(level, "error") == 0) {
+        log_level = beast_log_error;
+    } else {
+        return FAILURE;
+    }
+
+    return SUCCESS;
+}
+
 
 ZEND_INI_MH(php_beast_enable)
 {
@@ -1033,6 +1071,8 @@ PHP_INI_BEGIN()
           php_beast_log_file)
     PHP_INI_ENTRY("beast.log_user", "root", PHP_INI_ALL,
           php_beast_log_user)
+    PHP_INI_ENTRY("beast.log_level", "notice", PHP_INI_ALL,
+          php_beast_log_level)
     PHP_INI_ENTRY("beast.enable", "1", PHP_INI_ALL,
           php_beast_enable)
     PHP_INI_ENTRY("beast.networkcard", "eth0", PHP_INI_ALL,
@@ -1277,7 +1317,7 @@ PHP_MINIT_FUNCTION(beast)
         return FAILURE;
     }
 
-    if (beast_log_init(beast_log_file) == -1) {
+    if (beast_log_init(beast_log_file, log_level) == -1) {
         php_error_docref(NULL TSRMLS_CC,
                          E_ERROR, "Unable open log file for beast");
         return FAILURE;
