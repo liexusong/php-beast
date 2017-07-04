@@ -64,10 +64,6 @@ beast.log_level支持参数：
  Nginx + Fastcgi + (PHP-5.2.x ~ PHP-7.1.x)
 </code></pre>
 
-<h3>注意</h3>
-
-*1.* 如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
-
 ------------------------------
 
 ## 怎么加密项目
@@ -137,6 +133,14 @@ char *allow_networkcards[] = {
 *4.* beast_file_expire(): 获取一个文件的过期时间
 
 *5.* beast_clean_cache(): 清空beast的所有缓存(如果有文件更新, 可以使用此函数清空缓存)
+
+------------------------------
+
+## 常见问题
+
+*1.* linux：如果出现502错误，一般是由于GCC版本太低导致，请先升级GCC再安装本模块。
+
+*2.* Windows：IIS环境下FastCGI进程异常退出：尝试将IIS的运行用户从ApplicationPoolIdentity改为LocalSystem
 
 ------------------------------
 
