@@ -146,7 +146,7 @@ char *allow_networkcards[] = {
 
 作者: 列旭松(280259971@qq.com)。
 
-<b>my book:《<a href="http://book.jd.com/11123177.html">PHP核心技术与最佳实践</a>》</b>此书有详细的PHP扩展编写教程<br/>
+<b>my book:《<a href="https://item.jd.com/12450680.html">PHP核心技术与最佳实践(第二版)</a>》</b>此书有详细的PHP扩展编写教程<br/>
 ## 如果本项目能够帮到你的话请支持一下:
 <p>
 支付宝：<br />
