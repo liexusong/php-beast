@@ -1177,10 +1177,10 @@ static char *get_mac_address(char *networkcard)
     snprintf(netfile, 128, "/sys/class/net/%s/address", networkcard);
 
     if (access((const char *)netfile, R_OK) != 0) { /* File not exists */
-        return NULL;
+        snprintf(cmd, 128, "ifconfig %s|awk '/ether/ {print $2}'", networkcard);
+    } else {
+        snprintf(cmd, 128, "cat %s", netfile);
     }
-
-    snprintf(cmd, 128, "cat %s", netfile);
 
     fp = popen(cmd, "r");
     if (!fp) {
