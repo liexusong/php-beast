@@ -594,7 +594,11 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     struct beast_ops *ops = NULL;
     int destroy_file_handler = 0;
 
+#if 0
     fp = zend_fopen(h->filename, &opened_path TSRMLS_CC);
+#else
+    fp = fopen(h->filename, "rb");
+#endif
     if (fp != NULL) {
         fd = fileno(fp);
     } else {
