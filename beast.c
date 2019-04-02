@@ -614,7 +614,15 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         return NULL;
     }
 
-    if (retval == -1) goto final;  /* Using old_compile_file() */
+    if (retval == -1) {
+#if BEAST_EXECUTE_NORMAL_SCRIPT
+        goto final;
+#else
+        php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                         "Not allow execute normal PHP script");
+        return NULL;
+#endif
+    }
 
 #if BEAST_DEBUG_MODE
 
@@ -678,13 +686,7 @@ final:
         default_file_handler->destroy(default_file_handler);
     }
 
-#if BEAST_EXECUTE_NORMAL_SCRIPT
     return old_compile_file(h, type TSRMLS_CC);
-#else
-    php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                     "Not allow execute normal PHP script");
-    return NULL;
-#endif
 }
 
 
