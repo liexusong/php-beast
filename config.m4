@@ -19,7 +19,11 @@ dnl Make sure that the comment is aligned:
 
 PHP_ARG_ENABLE(beast-debug, whether to enable beast debug mode,
 dnl Make sure that the comment is aligned:
-[  --enable-beast-debug     Enable beast debug mode], no, no)
+[  --enable-beast-debug            Enable beast debug mode], no, no)
+
+PHP_ARG_ENABLE(execute-normal-script, whether to enable execute normal PHP script mode,
+dnl Make sure that the comment is aligned:
+[  --enable-execute-normal-script  Enable execute normal PHP script], yes, yes)
 
 if test "$PHP_BEAST" != "no"; then
   dnl Write more examples of tests here...
@@ -28,6 +32,12 @@ if test "$PHP_BEAST" != "no"; then
     AC_DEFINE(BEAST_DEBUG_MODE, 0, [ ])
   else
     AC_DEFINE(BEAST_DEBUG_MODE, 1, [ ])
+  fi
+
+  if test "$PHP_EXECUTE_NORMAL_SCRIPT" != "yes"; then
+    AC_DEFINE(BEAST_EXECUTE_NORMAL_SCRIPT, 0, [ ])
+  else
+    AC_DEFINE(BEAST_EXECUTE_NORMAL_SCRIPT, 1, [ ])
   fi
 
   dnl # --with-beast -> check with-path

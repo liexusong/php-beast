@@ -424,7 +424,8 @@ int decrypt_file(const char *filename, int stream,
 
     if ((n = read(stream, header, headerlen)) != headerlen) {
         beast_write_log(beast_log_error,
-                "Failed to readed header from file `%s', headerlen:%d, readlen:%d", filename, headerlen, n);
+            "Failed to readed header from file `%s', headerlen:%d, readlen:%d",
+            filename, headerlen, n);
         retval = -1;
         goto failed;
     }
@@ -677,7 +678,13 @@ final:
         default_file_handler->destroy(default_file_handler);
     }
 
+#if BEAST_EXECUTE_NORMAL_SCRIPT
     return old_compile_file(h, type TSRMLS_CC);
+#else
+    php_error_docref(NULL TSRMLS_CC, E_ERROR,
+                     "Not allow execute normal PHP script");
+    return NULL;
+#endif
 }
 
 
@@ -1286,7 +1293,7 @@ PHP_MINIT_FUNCTION(beast)
 
     if (validate_networkcard() == -1) {
         php_error_docref(NULL TSRMLS_CC, E_ERROR,
-                         "Not allowed run at this computer");
+                         "Not allow run at this computer");
         return FAILURE;
     }
 
