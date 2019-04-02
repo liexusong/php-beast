@@ -119,7 +119,10 @@ char *allow_networkcards[] = {
 ------------------------------
 
 ## 开启debug模式
-可以在configure时加入 `--enable-beast-debug` 选项来开启debug模式。开启debug模式后需要在php.ini配置文件中加入配置项：`beast.debug_path` 和 `beast.debug_mode`。`beast.debug_mode` 用于指定是否使用debug模式，而 `beast.debug_path` 用于输出解密后的php脚本源码。这样就可以在 `beast.debug_path` 目录中看到php-beast解密后的源代码，可以方便知道扩展解密是否正确。
+可以在configure时加上 `--enable-beast-debug` 选项来开启debug模式。开启debug模式后需要在php.ini配置文件中加入配置项：`beast.debug_path` 和 `beast.debug_mode`。`beast.debug_mode` 用于指定是否使用debug模式，而 `beast.debug_path` 用于输出解密后的php脚本源码。这样就可以在 `beast.debug_path` 目录中看到php-beast解密后的源代码，可以方便知道扩展解密是否正确。
+
+## 开启禁止执行未加密的脚本
+可以在configure时加上 `--enable-execute-normal-script=off` 选项来禁止执行未加密的PHP脚本。
 
 ------------------------------
 
