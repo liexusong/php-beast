@@ -54,7 +54,7 @@ void beast_spinlock(beast_atomic_t *lock, int pid)
 
         if (beast_ncpu > 1) {
 
-            for (n = 1; n < 129; n << 1) {
+            for (n = 1; n < 129; n <<= 1) {
 
                 if (compare_and_swap(lock, 0, pid)) {
                     return;
