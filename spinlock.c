@@ -35,6 +35,8 @@
       __sync_bool_compare_and_swap(lock, o, n)
   #ifdef __arm__
     #define pause() __asm__("NOP");
+  #elif __aarch64__
+    #define pause() __asm__("NOP");
   #else
     #define pause() __asm__("pause")
   #endif
