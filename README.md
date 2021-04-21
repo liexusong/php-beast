@@ -149,6 +149,6 @@ char *allow_networkcards[] = {
 
 ### 我们的公众号
 
-![](https://raw.githubusercontent.com/liexusong/linux-source-code-analyze/master/images/qrcode_linux_naxieshi.jpg)
+![](https://image-static.segmentfault.com/376/558/3765589661-607fef350658b_fix732)
 
 ------------------------------
