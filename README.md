@@ -147,16 +147,8 @@ char *allow_networkcards[] = {
 
 ------------------------------
 
-作者: 列旭松(280259971@qq.com)。
+### 我们的公众号
 
-<b>my book:《<a href="https://item.jd.com/12450680.html">PHP核心技术与最佳实践(第二版)</a>》</b>此书有详细的PHP扩展编写教程<br/>
-## 如果本项目能够帮到你的话请支持一下:
-<p>
-支付宝：<br />
-<img width="250" src="https://tfsimg.alipay.com/images/mobilecodec/T16NxhXe8lXXXXXXXX" /></p>
-<p>
-微信：<br />
-<img width="250" src="http://git.oschina.net/liexusong/php-beast/raw/master/images/pay.jpg?dir=0&filepath=images%2Fpay.jpg&oid=324fa98d10ed5db5a1ac5e765ce12db5d65cebd5&sha=20e9e714be2695829883a4055815a94d753545ec" />
-</p>
+![](https://raw.githubusercontent.com/liexusong/linux-source-code-analyze/master/images/qrcode_linux_naxieshi.jpg)
 
 ------------------------------
