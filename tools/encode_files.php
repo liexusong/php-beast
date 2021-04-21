@@ -53,7 +53,7 @@ function encrypt_directory($dir, $new_dir, $expire, $type)
         return false;
     }
 
-    while (($file = readdir($handle))) {
+    while (false !== ($file = readdir($handle))) {
         if ($file == '.' || $file == '..') {
             continue;
         }
