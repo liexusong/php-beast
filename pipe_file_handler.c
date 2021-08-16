@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "file_handler.h"
 
 struct pipe_handler_ctx {
