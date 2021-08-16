@@ -34,6 +34,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #include "zend.h"
 #include "zend_operators.h"
 #include "zend_globals.h"
+#include "zend_highlight.h"
 #include "zend_language_scanner.h"
 
 #include "zend_API.h"
@@ -657,8 +658,9 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
     }
 
     if (h->type == ZEND_HANDLE_FP) fclose(h->handle.fp);
+#ifdef ZEND_HANDLE_FD
     if (h->type == ZEND_HANDLE_FD) close(h->handle.fd);
-
+#endif
     /*
      * Get file handler and free context
      */
@@ -667,10 +669,12 @@ cgi_compile_file(zend_file_handle *h, int type TSRMLS_DC)
         h->type = ZEND_HANDLE_FP;
         h->handle.fp = default_file_handler->get_fp(default_file_handler);
         break;
+#ifdef ZEND_HANDLE_FD
     case BEAST_FILE_HANDLER_FD:
         h->type = ZEND_HANDLE_FD;
         h->handle.fd = default_file_handler->get_fd(default_file_handler);
         break;
+#endif
     }
 
 final:
